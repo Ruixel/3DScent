@@ -1,0 +1,143 @@
+[laser]
+x = 0
+y = 192
+type = image
+image = gauge06
+key = 1
+
+[vulcan]
+x = 25
+y = 192
+type = image
+image = gauge07
+key = 2
+
+[spread]
+x = 50
+y = 192
+type = image
+image = gauge08
+key = 3
+
+[plasma]
+x = 75
+y = 192
+type = image
+image = gauge09
+key = 4
+
+[fusion]
+x = 100
+y = 192
+type = image
+image = gauge10
+key = 5
+
+[conc]
+x = 125
+y = 192
+type = image
+image = gauge11
+key = 6
+
+[homing]
+x = 150
+y = 192
+type = image
+image = gauge12
+key = 7
+
+[proxi]
+x = 175
+y = 192
+type = image
+image = gauge13
+key = 8
+
+[smart]
+x = 200
+y = 192
+type = image
+image = gauge14
+key = 9
+
+[mega]
+x = 225
+y = 192
+type = image
+image = gauge15
+key = 0
+
+[score]
+x = -1
+y = 240
+type = score
+
+[warning]
+x = 16384
+y = -1
+type = homing_warning
+
+[energy]
+x = 2
+y = -1
+type = energy
+
+[shield]
+x = 2
+y = -9
+type = shield
+
+[pweapon]
+x = -1
+y = -9
+type = primary_weapon
+
+[sweapon]
+x = -1
+y = -1
+type = secondary_weapon
+
+[lives]
+x = 2
+y = 232
+type = lives
+
+[keys]
+x = 2
+y = 240
+type = keys
+
+[cloak]
+x = 2
+y = -17
+type = cloak
+
+[invuln]
+x = 2
+y = -25
+type = invuln
+
+[time]
+x = -1
+y = 256
+type = time
+
+[framerate]
+x = -1
+y = 264
+type = framerate
+
+[rollleft]
+x = 1
+y = 272
+type = text_med_gold
+text = <
+key = ,
+
+[rollright]
+x = -1
+y = 272
+type = text_med_gold
+text = >
+key = .
