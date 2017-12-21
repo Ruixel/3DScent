@@ -7,7 +7,7 @@ IN USING, DISPLAYING,  AND CREATING DERIVATIVE WORKS THEREOF, SO LONG AS
 SUCH USE, DISPLAY OR CREATION IS FOR NON-COMMERCIAL, ROYALTY OR REVENUE
 FREE PURPOSES.  IN NO EVENT SHALL THE END-USER USE THE COMPUTER CODE
 CONTAINED HEREIN FOR REVENUE-BEARING PURPOSES.  THE END-USER UNDERSTANDS
-AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.  
+AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.
 COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
 */
 /*
@@ -15,9 +15,9 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
  * $Revision: 1.19 $
  * $Author: allender $
  * $Date: 1995/11/14 14:23:17 $
- * 
+ *
  * Functions for keyboard handler.
- * 
+ *
  * $Log: key.c $
  * Revision 1.19  1995/11/14  14:23:17  allender
  * reallocate UPP when initing keyboard
@@ -83,115 +83,115 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
  * --- PC RCS information ---
  * Revision 1.34  1995/01/14  19:19:31  john
  * Made so when you press Shift+Baskspace, it release keys autmatically.
- * 
+ *
  * Revision 1.33  1994/12/13  09:21:48  john
  * Took out keyd_editor_mode, and KEY_DEBUGGED stuff for NDEBUG versions.
- * 
+ *
  * Revision 1.32  1994/11/12  13:52:01  john
  * Fixed bug with code that cleared bios buffer.
- * 
+ *
  * Revision 1.31  1994/10/24  15:16:16  john
  * Added code to detect KEY_PAUSE.
- * 
+ *
  * Revision 1.30  1994/10/24  13:57:53  john
  * Hacked in support for pause key onto code 0x61.
- * 
+ *
  * Revision 1.29  1994/10/21  15:18:13  john
  * *** empty log message ***
- * 
+ *
  * Revision 1.28  1994/10/21  15:17:24  john
  * Made LSHIFT+BACKSPACE do what PrtScr used to.
- * 
+ *
  * Revision 1.27  1994/09/22  16:09:18  john
  * Fixed some virtual memory lockdown problems with timer and
  * joystick.
- * 
+ *
  * Revision 1.26  1994/09/15  21:32:47  john
  * Added bounds checking for down_count scancode
  * parameter.
- * 
+ *
  * Revision 1.25  1994/08/31  12:22:20  john
  * Added KEY_DEBUGGED
- * 
+ *
  * Revision 1.24  1994/08/24  18:53:48  john
  * Made Cyberman read like normal mouse; added dpmi module; moved
  * mouse from assembly to c. Made mouse buttons return time_down.
- * 
+ *
  * Revision 1.23  1994/08/18  15:17:51  john
  * *** empty log message ***
- * 
+ *
  * Revision 1.22  1994/08/18  15:16:38  john
  * fixed some bugs with clear_key_times and then
  * removed it because i fixed key_flush to do the
  * same.
- * 
+ *
  * Revision 1.21  1994/08/17  19:01:25  john
  * Attempted to fix a bug with a key being held down
- * key_flush called, then the key released having too 
+ * key_flush called, then the key released having too
  * long of a time.
- * 
+ *
  * Revision 1.20  1994/08/08  10:43:48  john
  * Recorded when a key was pressed for key_inkey_time.
- * 
+ *
  * Revision 1.19  1994/06/22  15:00:03  john
  * Made keyboard close automatically on exit.
- * 
+ *
  * Revision 1.18  1994/06/21  09:16:29  john
  * *** empty log message ***
- * 
+ *
  * Revision 1.17  1994/06/21  09:08:23  john
  * *** empty log message ***
- * 
+ *
  * Revision 1.16  1994/06/21  09:05:01  john
  * *** empty log message ***
- * 
+ *
  * Revision 1.15  1994/06/21  09:04:24  john
  * Made PrtScreen do an int5
- * 
+ *
  * Revision 1.14  1994/06/17  17:17:06  john
  * Added keyd_time_last_key_was_pressed or something like that.
- * 
+ *
  * Revision 1.13  1994/05/14  13:55:16  matt
  * Added #define to control key passing to bios
- * 
+ *
  * Revision 1.12  1994/05/05  18:09:39  john
  * Took out BIOS to prevent stuck keys.
- * 
+ *
  * Revision 1.11  1994/05/03  17:39:12  john
  * *** empty log message ***
- * 
+ *
  * Revision 1.10  1994/04/29  12:14:20  john
  * Locked all memory used during interrupts so that program
  * won't hang when using virtual memory.
- * 
+ *
  * Revision 1.9  1994/04/28  23:49:41  john
  * Made key_flush flush more keys and also did something else but i forget what.
- * 
+ *
  * Revision 1.8  1994/04/22  12:52:12  john
  * *** empty log message ***
- * 
+ *
  * Revision 1.7  1994/04/01  10:44:59  mike
  * Change key_getch() to call getch() if our interrupt hasn't been installed.
- * 
+ *
  * Revision 1.6  1994/03/09  10:45:48  john
  * Neatend code a bit.
- * 
+ *
  * Revision 1.5  1994/02/17  17:24:16  john
  * Neatened up a bit.
- * 
+ *
  * Revision 1.4  1994/02/17  16:30:29  john
  * Put in code to pass keys when in debugger.
- * 
+ *
  * Revision 1.3  1994/02/17  15:57:59  john
  * Made handler not chain to BIOS handler.
- * 
+ *
  * Revision 1.2  1994/02/17  15:56:06  john
  * Initial version.
- * 
+ *
  * Revision 1.1  1994/02/17  15:54:07  john
  * Initial revision
- * 
- * 
+ *
+ *
  */
 /*
 #pragma off (unreferenced)
@@ -239,7 +239,7 @@ static keyboard key_data;
 
 static unsigned char Installed=0;
 
-unsigned char ascii_table[128] = 
+unsigned char ascii_table[128] =
 { 255, 255, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=',255,255,
   'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', 255, 255,
   'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', 39, '`',
@@ -250,10 +250,10 @@ unsigned char ascii_table[128] =
   255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
   255,255,255,255,255,255,255,255 };
 
-unsigned char shifted_ascii_table[128] = 
+unsigned char shifted_ascii_table[128] =
 { 255, 255, '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+',255,255,
   'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', 255, 255,
-  'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '~', 
+  'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '~',
   255, '|', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?', 255,255,
   255, ' ', 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,255,255,
   255, 255, 255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
@@ -288,7 +288,7 @@ void keyboard_updatekey (int keycode, int state)
 			key->state = 1;
 			key->timewentdown = keyd_time_when_last_pressed = timer_get_fixed_seconds();
 			key->counter++;
-		} else {	
+		} else {
 			keyd_pressed[keycode] = 0;
 			key->upcount += key->state;
 			key->state = 0;
@@ -336,7 +336,8 @@ void keyboard_handler()
 	else
 		keys = keysHeld ();
 
-	keyboard_updatekey (KEY_RIGHT, keys & nds_KEY_RIGHT ? 1 : 0);
+    // Get Key button presses from the NDS, TODO
+/*	keyboard_updatekey (KEY_RIGHT, keys & nds_KEY_RIGHT ? 1 : 0);
 	keyboard_updatekey (KEY_LEFT, keys & nds_KEY_LEFT ? 1 : 0);
 	keyboard_updatekey (KEY_UP, keys & nds_KEY_UP ? 1 : 0);
 	keyboard_updatekey (KEY_DOWN, keys & nds_KEY_DOWN ? 1 : 0);
@@ -360,7 +361,7 @@ void keyboard_handler()
 	{
 		keyboard_updatekey (KEY_ESC, pressed & nds_KEY_START ? 1 : 0);
 		keyboard_updatekey (KEY_TAB, keys & nds_KEY_SELECT ? 1 : 0);
-	}
+	}*/
 }
 /*
 void key_close(void)
@@ -377,7 +378,7 @@ void key_init()
 
 	if (Installed) return;
 	Installed = 1;
-		
+
 	key_flush();
 
 //	atexit(key_close);
@@ -416,7 +417,7 @@ void key_flush()
 
 	if (!Installed)
 		key_init();
-		
+
 	key_data.keyhead = key_data.keytail = 0;
 
 	//Clear the keyboard buffer
@@ -424,9 +425,9 @@ void key_flush()
 		key_data.keybuffer[i] = 0;
 		key_data.time_pressed[i] = 0;
 	}
-	
+
 	curtime = timer_get_fixed_seconds();
-	
+
 	for (i=0; i<256; i++ )	{
 		keyd_pressed[i] = 0;
 		key_data.keys[i].state = 1;
@@ -464,7 +465,7 @@ int key_inkey()
 
 	if (!Installed)
 		key_init();
-		
+
 	if (key_data.keytail!=key_data.keyhead) {
 		key = key_data.keybuffer[key_data.keyhead];
 		key_data.keyhead = add_one(key_data.keyhead);

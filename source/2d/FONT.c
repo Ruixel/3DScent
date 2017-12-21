@@ -7,7 +7,7 @@ IN USING, DISPLAYING,  AND CREATING DERIVATIVE WORKS THEREOF, SO LONG AS
 SUCH USE, DISPLAY OR CREATION IS FOR NON-COMMERCIAL, ROYALTY OR REVENUE
 FREE PURPOSES.  IN NO EVENT SHALL THE END-USER USE THE COMPUTER CODE
 CONTAINED HEREIN FOR REVENUE-BEARING PURPOSES.  THE END-USER UNDERSTANDS
-AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.  
+AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.
 COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
 */
 /* $Source: Smoke:miner:source:2d::RCS:font.c $
@@ -65,91 +65,91 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
  * --- PC RCS information ---
  * Revision 1.28  1994/11/27  23:08:22  matt
  * Changes for new mprintf calling convention
- * 
+ *
  * Revision 1.27  1994/11/18  23:54:50  john
  * Made centering work on x = 0x8000 not -0x8000.
- * 
+ *
  * Revision 1.26  1994/11/18  22:50:23  john
  * Changed shorts to ints in parameters.
- * 
+ *
  * Revision 1.25  1994/11/04  11:10:31  john
  * Took the & out of string sizing.
- * 
+ *
  * Revision 1.24  1994/11/04  10:06:36  john
  * Added fade table for fading fonts. Made font that partially clips
  * not print a warning message.
- * 
+ *
  * Revision 1.23  1994/09/29  10:09:06  john
  * Added real clipping to text.
- * 
+ *
  * Revision 1.22  1994/09/12  19:27:51  john
  * Fixed bug with unclipped fonts clipping.
- * 
+ *
  * Revision 1.21  1994/09/12  17:16:59  john
  * Added clipping.
- * 
+ *
  * Revision 1.20  1994/08/28  16:43:01  matt
  * Added centering if x==0x8000
- * 
+ *
  * Revision 1.19  1994/08/15  15:01:11  matt
  * Close font file after reading
- * 
+ *
  * Revision 1.18  1994/08/12  18:17:42  matt
  * Fixed stupid bug that cause first char in font not to print
- * 
+ *
  * Revision 1.17  1994/08/11  18:00:17  matt
  * Cleaned up code, fixed string width bug.
- * 
+ *
  * Revision 1.16  1994/08/10  18:46:11  matt
  * Fixed a couple of little things
- * 
+ *
  * Revision 1.15  1994/08/10  18:36:20  matt
  * Changed font file format.  Made chars not in font plot as spaces.  Font file
  * now stores palette for color font & remaps on load.
- * 
+ *
  * Revision 1.14  1994/08/10  12:27:27  matt
  * Took out unneeded int3
- * 
+ *
  * Revision 1.13  1994/08/10  12:25:26  matt
  * Added support for colors fonts & kerned fonts
  * Made our own font file format
- * 
+ *
  * Revision 1.12  1994/07/22  17:19:00  john
  * made proportional font width be the max width.
- * 
+ *
  * Revision 1.11  1994/05/06  12:50:26  john
  * Added supertransparency; neatend things up; took out warnings.
- * 
+ *
  * Revision 1.10  1994/01/31  11:08:12  john
  * fixed bug with order of frees.
- * 
+ *
  * Revision 1.9  1994/01/31  10:36:40  john
  * Free'd variable size font data.
- * 
+ *
  * Revision 1.8  1994/01/27  17:17:40  john
  * Made error if font file doesn't exist.
- * 
+ *
  * Revision 1.7  1993/10/26  13:17:48  john
  * *** empty log message ***
- * 
+ *
  * Revision 1.6  1993/10/15  16:23:25  john
  * y
- * 
+ *
  * Revision 1.5  1993/09/28  19:05:50  john
  * added support for \n in gr_string and gr_get_string_size
- * 
+ *
  * Revision 1.4  1993/09/28  12:46:49  matt
  * On error, now call Error() instead of exit().
- * 
+ *
  * Revision 1.3  1993/09/20  11:35:31  john
  * *** empty log message ***
- * 
+ *
  * Revision 1.2  1993/09/08  15:54:39  john
  * renamed ReadFile to readfontfile to prevent conflicts with others.
- * 
+ *
  * Revision 1.1  1993/09/08  11:43:34  john
  * Initial revision
- * 
+ *
  *
  */
 
@@ -527,26 +527,26 @@ int gr_string(int x, int y, char *s )
 		gr_get_string_size(s, &w, &h, &aw );
 		// for x, since this will be centered, only look at
 		// width.
-		if ( w > grd_curcanv->cv_bitmap.bm_w ) clipped |= 1;	
-		if ( (y+h) > grd_curcanv->cv_bitmap.bm_h ) clipped |= 1;	
+		if ( w > grd_curcanv->cv_bitmap.bm_w ) clipped |= 1;
+		if ( (y+h) > grd_curcanv->cv_bitmap.bm_h ) clipped |= 1;
 
-		if ( (y+h) < 0 ) clipped |= 2;	
-		if ( y > grd_curcanv->cv_bitmap.bm_h ) clipped |= 2;	
+		if ( (y+h) < 0 ) clipped |= 2;
+		if ( y > grd_curcanv->cv_bitmap.bm_h ) clipped |= 2;
 
 	} else {
 		if ( (x<0) || (y<0) ) clipped |= 1;
 		gr_get_string_size(s, &w, &h, &aw );
-		if ( (x+w) > grd_curcanv->cv_bitmap.bm_w ) clipped |= 1;	
-		if ( (y+h) > grd_curcanv->cv_bitmap.bm_h ) clipped |= 1;	
-		if ( (x+w) < 0 ) clipped |= 2;	
-		if ( (y+h) < 0 ) clipped |= 2;	
-		if ( x > grd_curcanv->cv_bitmap.bm_w ) clipped |= 2;	
-		if ( y > grd_curcanv->cv_bitmap.bm_h ) clipped |= 2;	
+		if ( (x+w) > grd_curcanv->cv_bitmap.bm_w ) clipped |= 1;
+		if ( (y+h) > grd_curcanv->cv_bitmap.bm_h ) clipped |= 1;
+		if ( (x+w) < 0 ) clipped |= 2;
+		if ( (y+h) < 0 ) clipped |= 2;
+		if ( x > grd_curcanv->cv_bitmap.bm_w ) clipped |= 2;
+		if ( y > grd_curcanv->cv_bitmap.bm_h ) clipped |= 2;
 	}
 
 	if ( !clipped )
 		return gr_ustring(x, y, s );
-	
+
 	if ( clipped & 2 )	{
 		// Completely clipped...
 		mprintf( (1, "Text '%s' at (%d,%d) is off screen!\n", s, x, y ));
@@ -560,12 +560,12 @@ int gr_string(int x, int y, char *s )
 
 	// Partially clipped...
 
-	if (FFLAGS & FT_COLOR) 
+	if (FFLAGS & FT_COLOR)
 		return gr_internal_color_string( x, y, s);
 
 	if ( BG_COLOR == -1)
 		return gr_internal_string_clipped_m( x, y, s );
-	
+
 	return gr_internal_string_clipped( x, y, s );
 }
 
@@ -650,7 +650,7 @@ void gr_close_font( grs_font * font )
 {
 	if (font)
 	{
-		if ( font->ft_chars ) 
+		if ( font->ft_chars )
 			free( font->ft_chars );
 		free( font );
 	}
@@ -688,7 +688,7 @@ grs_font * gr_init_font( char * fontname )
 	if (font->ft_flags & FT_PROPORTIONAL) {
 
 		font->ft_widths = (short *) (((int) font->ft_widths) + ((ubyte *) font));
-		
+
 		font->ft_data = ((int) font->ft_data) + ((ubyte *) font);
 
 		font->ft_chars = (unsigned char **)malloc( nchars * sizeof(unsigned char *));
@@ -713,7 +713,7 @@ grs_font * gr_init_font( char * fontname )
 		ptr = font->ft_data + (nchars * font->ft_w * font->ft_h);
 	}
 
-	if (font->ft_flags & FT_KERNED) 
+	if (font->ft_flags & FT_KERNED)
 		font->ft_kerndata = ((int) font->ft_kerndata) + ((ubyte *) font);
 
 	if (font->ft_flags & FT_COLOR) {		//remap palette
@@ -722,7 +722,7 @@ grs_font * gr_init_font( char * fontname )
 		int freq[256];
 
 		cfread(palette,3,256,fontfile);		//read the palette
-		
+
 		build_colormap_good( palette, colormap, freq );
 
 		colormap[TRANSPARENCY_COLOR] = TRANSPARENCY_COLOR;
@@ -769,7 +769,7 @@ int gr_internal_string_clipped(int x, int y, char *s )
 	char * text_ptr, * next_row, * text_ptr1;
 	int r, BitMask, i, bits, width, spacing, letter, underline;
 	int x1 = x;
-	
+
 	next_row = s;
 
 	while (next_row != NULL )
@@ -815,7 +815,7 @@ int gr_internal_string_clipped(int x, int y, char *s )
 				if (underline)	{
 					for (i=0; i< width; i++ )	{
 						gr_setcolor(FG_COLOR);
-						gr_pixel( x++, y );						
+						gr_pixel( x++, y );
 					}
 				} else {
 					fp += BITS_TO_BYTES(width)*r;
@@ -828,11 +828,11 @@ int gr_internal_string_clipped(int x, int y, char *s )
 							bits = *fp++;
 							BitMask = 0x80;
 						}
-						if (bits & BitMask)	
+						if (bits & BitMask)
 							gr_setcolor(FG_COLOR);
 						else
 							gr_setcolor(BG_COLOR);
-						gr_pixel( x++, y );						
+						gr_pixel( x++, y );
 						BitMask >>= 1;
 					}
 				}
@@ -853,7 +853,7 @@ int gr_internal_string_clipped_m(int x, int y, char *s )
 	char * text_ptr, * next_row, * text_ptr1;
 	int r, BitMask, i, bits, width, spacing, letter, underline;
 	int x1 = x;
-	
+
 	next_row = s;
 
 	while (next_row != NULL )
@@ -899,7 +899,7 @@ int gr_internal_string_clipped_m(int x, int y, char *s )
 				if (underline)	{
 					for (i=0; i< width; i++ )	{
 						gr_setcolor(FG_COLOR);
-						gr_pixel( x++, y );						
+						gr_pixel( x++, y );
 					}
 				} else {
 					fp += BITS_TO_BYTES(width)*r;
@@ -917,7 +917,7 @@ int gr_internal_string_clipped_m(int x, int y, char *s )
 							gr_pixel( x++, y );
 						} else {
 							x++;
-						}						
+						}
 						BitMask >>= 1;
 					}
 				}

@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "ndsw.h"
+#include "3ds.h"
 
 #include "fix.h"
 #include "gr.h"
@@ -79,10 +79,10 @@ texture_ll_t	texture_ll_pool[MAX_TEX_BUFFER], *texture_ll, *texture_ll_free;
 
 ITCM_CODE void sync_palette ()
 {
-	u16	*s, *dt, *db, *d3d;
+	/*u16	*s, *dt, *db, *d3d;
 	int	i;
 
-	vramSetBankF (VRAM_F_LCD);
+	//vramSetBankF (VRAM_F_LCD);
 	for (i=0, s=ds_palette, dt=palette_top, db=palette_bottom, d3d=palette3d; i<256; i++)
 	{
 		*dt++ = *s;
@@ -91,12 +91,12 @@ ITCM_CODE void sync_palette ()
 	}
 	palette3d[0] = ds_palette[255];
 	palette3d[255] = ds_palette[0];
-	vramSetBankF (VRAM_F_TEX_PALETTE);
+	//vramSetBankF (VRAM_F_TEX_PALETTE);*/
 }
 
 ITCM_CODE void irq_Vblank (void)
 {
-	texture_ll_t	*tex;
+	/*texture_ll_t	*tex;
 
 	if (palette_updated)
 	{
@@ -122,15 +122,15 @@ ITCM_CODE void irq_Vblank (void)
 // this doesnt work
 //		VRAM_CR = ((VRAM_ENABLE | VRAM_A_TEXTURE) | ((VRAM_ENABLE | VRAM_B_TEXTURE) << 8) | ((VRAM_ENABLE | VRAM_C_TEXTURE) << 16) | ((VRAM_ENABLE | VRAM_D_TEXTURE) << 24));
 // but this does ?
-//		vramRestoreMainBanks ((VRAM_ENABLE | VRAM_A_TEXTURE) | ((VRAM_ENABLE | VRAM_B_TEXTURE) << 8) | ((VRAM_ENABLE | VRAM_C_TEXTURE) << 16) | ((VRAM_ENABLE | VRAM_D_TEXTURE) << 24));
-	}
+//		vramRestoreMainBanks ((VRAM_ENABLE | VRAM_A_TEXTURE) | ((VRAM_ENABLE | VRAM_B_TEXTURE) << 8) | ((VRAM_ENABLE | VRAM_C_TEXTURE) << 16) | ((VRAM_ENABLE | VRAM_D_TEXTURE) << 24));*/
+	//}
 }
 
 bool doSleep;
 
 ITCM_CODE void bitblt_to_screen ()
 {
-	scanKeys ();
+	/*scanKeys ();
 /*
 	{
 		extern grs_font *Gamefonts[];
@@ -151,7 +151,7 @@ ITCM_CODE void bitblt_to_screen ()
 		gr_set_current_canvas (save_canvas);
 	}
 */
-	keyboard_handler ();
+	/*keyboard_handler ();
 	mouse_handler ();
 
 	DC_FlushRange (back_buffer, 256 * 192 * 2);
@@ -164,7 +164,7 @@ ITCM_CODE void bitblt_to_screen ()
 
 	// Clear the FIFO
 //	GFX_STATUS |= (1 << 29) | (1 << 15);
-	swiWaitForVBlank ();
+	swiWaitForVBlank ();*/
 }
 
 #ifdef WIFI_DEBUG
@@ -182,7 +182,7 @@ u32 getExceptionAddress( u32 opcodeAddress, u32 thumbState);
 
 void set_error_console ()
 {
-	videoSetMode(0);
+	/*videoSetMode(0);
 	videoSetModeSub(MODE_0_2D | DISPLAY_BG0_ACTIVE);
 	vramSetBankC(VRAM_C_SUB_BG);
 
@@ -191,13 +191,13 @@ void set_error_console ()
 	BG_PALETTE_SUB[0] = RGB15(31,0,0);
 	BG_PALETTE_SUB[255] = RGB15(31,31,31);
 
-	consoleDemoInit();
+	consoleDemoInit();*/
 }
 //---------------------------------------------------------------------------------
 static void my_handler()
 {
 //---------------------------------------------------------------------------------
-	set_error_console ();
+	/*set_error_console ();
 
 	iprintf("\x1b[5CException Occured!\n");
 	u32	currentMode = getCPSR() & 0x1f;
@@ -215,7 +215,7 @@ static void my_handler()
 			exceptionAddress = getExceptionAddress( codeAddress, thumbState);
 		else
 			exceptionAddress = codeAddress;
-			
+
 	} else {
 		if (thumbState)
 			offset = 2;
@@ -251,7 +251,7 @@ static void my_handler()
 		}
 		fclose (fptr);
 	}
-*/	while(1);
+*/	//while(1);
 }
 #endif
 
@@ -259,7 +259,7 @@ void Snd_ParseMessage (u32 msg);
 
 ITCM_CODE void irq_arm9_fifo (void)
 {
-	while ( !(REG_IPC_FIFO_CR & IPC_FIFO_RECV_EMPTY))
+	/*while ( !(REG_IPC_FIFO_CR & IPC_FIFO_RECV_EMPTY))
 	{
 		u32 value = REG_IPC_FIFO_RX;
 		u32 msg = value & 0xffffff;
@@ -273,17 +273,17 @@ ITCM_CODE void irq_arm9_fifo (void)
 			doSleep = msg >> 8 & 0xff;
 			break;
 		}
-	}
+	}*/
 }
 
 void nds_init ()
 {
-	softkey_create_keyboards ();
+	/*softkey_create_keyboards ();
 
 	powerOn (POWER_ALL);
 
 	irqSet (IRQ_VBLANK, (irq_func_t)irq_Vblank);
-	videoSetMode (MODE_5_3D | DISPLAY_BG3_ACTIVE); 
+	videoSetMode (MODE_5_3D | DISPLAY_BG3_ACTIVE);
 	vramSetBankA (VRAM_A_TEXTURE);
 	vramSetBankB (VRAM_B_TEXTURE);
 	vramSetBankC (VRAM_C_TEXTURE);
@@ -307,7 +307,7 @@ void nds_init ()
 	BG_PALETTE_SUB[255] = RGB15 (31, 31, 31);
 	consoleDemoInit ();
 #else
-	videoSetModeSub (MODE_5_2D | DISPLAY_BG3_ACTIVE); 
+	videoSetModeSub (MODE_5_2D | DISPLAY_BG3_ACTIVE);
 	vramSetBankH (VRAM_H_SUB_BG);
 	vramSetBankI (VRAM_I_SUB_BG_0x06208000);
 	REG_BG3CNT_SUB = BG_BMP8_256x256;
@@ -373,6 +373,7 @@ void nds_init ()
 #ifdef EXCEPT_DEBUG
 	setExceptionHandler (my_handler) ;
 #endif
+   */
 }
 
 // sorta hack to support the cloaked effect
@@ -396,7 +397,7 @@ void g3_set_special_render(void (*tmap_drawer)(grs_bitmap *bm,int nv,g3s_point *
 */
 void nds_set_render_size (int x, int y, int w, int h)
 {
-	glViewport (x, y, x + w, y + h);
+	//glViewport (x, y, x + w, y + h);
 }
 
 typedef struct
@@ -414,7 +415,7 @@ int	last_bound_key = -1;
 
 void init_nds_textures (void)
 {
-	int	i;
+	/*int	i;
 
 	next_tex_addr = (u32 *)0x06800000;
 
@@ -434,7 +435,7 @@ void init_nds_textures (void)
 		texture_ll_pool[i - 1].next = &texture_ll_pool[i];
 		texture_ll_pool[i].texture = textures[i];
 	}
-	texture_ll_pool[MAX_TEX_BUFFER - 1].next = NULL;
+	texture_ll_pool[MAX_TEX_BUFFER - 1].next = NULL;*/
 }
 
 void scale_inbitmap(grs_bitmap *dst, grs_bitmap *src );
@@ -442,7 +443,7 @@ void gr_bm_ubitblt_rle(int w, int h, int dx, int dy, int sx, int sy, grs_bitmap 
 
 int find_bitmap_in_vram (int key)
 {
-	int	i;
+	/*int	i;
 
 	for (i=0; i<MAX_GL_TEXTURES; i++)
 	{
@@ -450,7 +451,7 @@ int find_bitmap_in_vram (int key)
 			return i;
 	}
 
-	return -1;
+	return -1;*/
 }
 
 ITCM_CODE void bind_texture (grs_bitmap *bmp)
@@ -469,7 +470,7 @@ ITCM_CODE void bind_texture (grs_bitmap *bmp)
 		return;
 	}
 */
-	if (bmp->texname != -1 && gl_textures[bmp->texname].key == bmp->key)
+	/*if (bmp->texname != -1 && gl_textures[bmp->texname].key == bmp->key)
 	{
 		gltex = &gl_textures[bmp->texname];
 		gltex->last_frame_used = FrameCount;
@@ -591,7 +592,7 @@ moveon:
 	GFX_TEX_FORMAT = gltex->format;
 	tex->addr = addr;
 	tex->next = texture_ll;
-	texture_ll = tex;
+	texture_ll = tex;*/
 }
 
 #define do_vertex_color(n) \
@@ -633,7 +634,7 @@ g3_draw_tmap_func_t	g3_draw_tmap_func = (g3_draw_tmap_func_t)g3_draw_tmap_tex;
 
 ITCM_CODE void g3_draw_poly (int nv, vms_vector **pointlist)
 {
-	int	i;
+	/*int	i;
 
 	GFX_TEX_FORMAT = 0;
 	last_bound_key = -1;
@@ -666,12 +667,12 @@ ITCM_CODE void g3_draw_poly (int nv, vms_vector **pointlist)
 			do_vertex (0);
 		}
 	}
-	GFX_END = 0;
+	GFX_END = 0;*/
 }
 
 ITCM_CODE void g3_draw_tmap_flat (int nv, vms_vector **pointlist, g3s_uvl *uvl_list, grs_bitmap *bm)
 {
-	int	color, i;
+	/*int	color, i;
 	fix	average_light;
 
 	GFX_TEX_FORMAT = 0;
@@ -722,12 +723,12 @@ ITCM_CODE void g3_draw_tmap_flat (int nv, vms_vector **pointlist, g3s_uvl *uvl_l
 			do_vertex (0);
 		}
 	}
-	GFX_END = 0;
+	GFX_END = 0;*/
 }
 
 ITCM_CODE void g3_draw_tmap_tex (int nv, vms_vector **pointlist, g3s_uvl *uvl_list, grs_bitmap *bm)
 {
-	int	i;
+	/*int	i;
 
 	check_and_bind_texture (bm);
 
@@ -797,12 +798,12 @@ ITCM_CODE void g3_draw_tmap_tex (int nv, vms_vector **pointlist, g3s_uvl *uvl_li
 			}
 		}
 		GFX_END = 0;
-	}
+	}*/
 }
 
 ITCM_CODE void g3_draw_bitmap (vms_vector *pos,fix width,fix height,grs_bitmap *bm)
 {
-	g3s_point	pnt;
+	/*g3s_point	pnt;
 	fix			x1, x2, y1, y2, z;
 	fix			u1, u2, v1, v2;
 
@@ -836,5 +837,5 @@ ITCM_CODE void g3_draw_bitmap (vms_vector *pos,fix width,fix height,grs_bitmap *
 	GFX_TEX_COORD = TEXTURE_PACK (u1, v1);
 	GFX_VERTEX16 = VERTEX_PACK (x1, y2);
 	GFX_VERTEX16 = z;
-	GFX_END = 0;
+	GFX_END = 0;*/
 }

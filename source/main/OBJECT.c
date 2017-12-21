@@ -7,7 +7,7 @@ IN USING, DISPLAYING,  AND CREATING DERIVATIVE WORKS THEREOF, SO LONG AS
 SUCH USE, DISPLAY OR CREATION IS FOR NON-COMMERCIAL, ROYALTY OR REVENUE
 FREE PURPOSES.  IN NO EVENT SHALL THE END-USER USE THE COMPUTER CODE
 CONTAINED HEREIN FOR REVENUE-BEARING PURPOSES.  THE END-USER UNDERSTANDS
-AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.  
+AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.
 COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
 */
 /*
@@ -15,9 +15,9 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
  * $Revision: 1.5 $
  * $Author: allender $
  * $Date: 1995/10/26 14:08:03 $
- * 
+ *
  * object rendering
- * 
+ *
  * $Log: object.c $
  * Revision 1.5  1995/10/26  14:08:03  allender
  * optimization to do physics on objects that didn't render last
@@ -37,288 +37,288 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
  *
  * Revision 2.1  1995/03/21  08:38:51  john
  * Ifdef'd out the NETWORK code.
- * 
+ *
  * Revision 2.0  1995/02/27  11:28:14  john
  * New version 2.0, which has no anonymous unions, builds with
  * Watcom 10.0, and doesn't require parsing BITMAPS.TBL.
- * 
+ *
  * Revision 1.335  1995/02/22  12:57:30  allender
  * remove anonymous unions from object structure
- * 
+ *
  * Revision 1.334  1995/02/09  22:04:40  mike
  * fix lifeleft on badass weapons.
- * 
+ *
  * Revision 1.333  1995/02/08  12:54:00  matt
  * Fixed object freeing code which was deleting some explosions it shouldn't
- * 
+ *
  * Revision 1.332  1995/02/08  11:37:26  mike
  * Check for failures in call to obj_create.
- * 
+ *
  * Revision 1.331  1995/02/05  17:48:52  rob
  * Changed assert in obj_relink, more robust.
- * 
+ *
  * Revision 1.330  1995/02/05  13:39:48  mike
  * remove invulnerability effect code (actually, comment out).
- * 
+ *
  * Revision 1.329  1995/02/04  12:29:52  rob
  * Get rid of potential assert error for explosion detachment.
- * 
+ *
  * Revision 1.328  1995/02/01  18:15:57  rob
  * Removed debugging output from engine glow change.
- * 
+ *
  * Revision 1.327  1995/02/01  16:20:12  matt
  * Made engine glow vary over a wider range, and made the glow be based
  * on thrust/speed, without regard to direction.
- * 
+ *
  * Revision 1.326  1995/01/29  14:46:24  rob
  * Fixed invul. vclip to only appear on player who is invul.
- * 
+ *
  * Revision 1.325  1995/01/29  13:48:16  mike
  * Add invulnerability graphical effect viewable by other players.
- * 
+ *
  * Revision 1.324  1995/01/29  11:39:25  mike
  * Add invulnerability effect.
- * 
+ *
  * Revision 1.323  1995/01/27  17:02:41  mike
  * add more information to an Error call.
- * 
+ *
  * Revision 1.322  1995/01/26  22:11:30  mike
  * Purple chromo-blaster (ie, fusion cannon) spruce up (chromification)
- * 
+ *
  * Revision 1.321  1995/01/25  20:04:10  matt
  * Moved matrix check to avoid orthogonalizing an uninitialize matrix
- * 
+ *
  * Revision 1.320  1995/01/25  12:11:35  matt
  * Make sure orient matrix is orthogonal when resetting player object
- * 
+ *
  * Revision 1.319  1995/01/21  21:46:22  mike
  * Optimize code in Assert (and prevent warning message).
- * 
+ *
  * Revision 1.318  1995/01/21  21:22:16  rob
  * Removed HUD clear messages.
  * Added more Asserts to try and find illegal control type bug.
- * 
+ *
  * Revision 1.317  1995/01/15  15:34:30  matt
  * When freeing object slots, don't free fireballs that will be deleting
  * other objects.
- * 
+ *
  * Revision 1.316  1995/01/14  19:16:48  john
  * First version of new bitmap paging code.
- * 
+ *
  * Revision 1.315  1995/01/12  18:53:37  john
  * Fixed parameter passing error.
- * 
+ *
  * Revision 1.314  1995/01/12  12:09:47  yuan
  * Added coop object capability.
- * 
+ *
  * Revision 1.313  1994/12/15  16:45:44  matt
  * Took out slew stuff for release version
- * 
+ *
  * Revision 1.312  1994/12/15  13:04:25  mike
  * Replace Players[Player_num].time_total references with GameTime.
- * 
+ *
  * Revision 1.311  1994/12/15  11:01:04  mike
  * add Object_minus_one for debugging.
- * 
+ *
  * Revision 1.310  1994/12/15  03:03:33  matt
  * Added error checking for NULL return from object_create_explosion()
- * 
+ *
  * Revision 1.309  1994/12/14  17:25:31  matt
  * Made next viewer func based on release not ndebug
- * 
+ *
  * Revision 1.308  1994/12/13  12:55:42  mike
  * hostages on board messages for when you die.
- * 
+ *
  * Revision 1.307  1994/12/12  17:18:11  mike
  * make boss cloak/teleport when get hit, make quad laser 3/4 as powerful.
- * 
+ *
  * Revision 1.306  1994/12/12  00:27:11  matt
  * Added support for no-levelling option
- * 
+ *
  * Revision 1.305  1994/12/11  22:41:14  matt
  * Added command-line option, -nolevel, which turns off player ship levelling
- * 
+ *
  * Revision 1.304  1994/12/11  22:03:23  mike
  * free up object slots as necessary.
- * 
+ *
  * Revision 1.303  1994/12/11  14:09:31  mike
  * make boss explosion sounds softer.
- * 
+ *
  * Revision 1.302  1994/12/11  13:25:11  matt
  * Restored calls to fix_object_segs() when debugging is turned off, since
  * it's not a big routine, and could fix some possibly bad problems.
- * 
+ *
  * Revision 1.301  1994/12/11  12:38:25  mike
  * make boss explosion sounds louder in create_small_fireball.
- * 
+ *
  * Revision 1.300  1994/12/10  15:28:37  matt
  * Added asserts for debugging
- * 
+ *
  * Revision 1.299  1994/12/09  16:18:51  matt
  * Fixed init_player_object, for editor
- * 
+ *
  * Revision 1.298  1994/12/09  15:03:10  matt
  * Two changes for Mike:
  *   1.  Do better placement of camera during death sequence (prevents hang)
  *   2.  Only record dodging information if the player fired in a frame
- * 
+ *
  * Revision 1.297  1994/12/09  14:59:12  matt
  * Added system to attach a fireball to another object for rendering purposes,
  * so the fireball always renders on top of (after) the object.
- * 
+ *
  * Revision 1.296  1994/12/08  20:05:07  matt
  * Removed unneeded debug message
- * 
+ *
  * Revision 1.295  1994/12/08  12:36:02  matt
  * Added new object allocation & deallocation functions so other code
  * could stop messing around with internal object data structures.
- * 
+ *
  * Revision 1.294  1994/12/07  20:13:37  matt
  * Added debris object limiter
- * 
+ *
  * Revision 1.293  1994/12/06  16:58:38  matt
  * Killed warnings
- * 
+ *
  * Revision 1.292  1994/12/05  22:34:35  matt
- * Make tmap_override objects use override texture as alt texture.  This 
+ * Make tmap_override objects use override texture as alt texture.  This
  * should have the effect of making simpler models use the override texture.
- * 
+ *
  * Revision 1.291  1994/12/05  12:23:53  mike
  * make camera start closer, but move away from player in death sequence.
- * 
+ *
  * Revision 1.290  1994/12/02  11:11:18  mike
  * hook sound effect to player small explosions (ctrlcen, too).
- * 
+ *
  * Revision 1.289  1994/11/28  21:50:52  mike
  * optimizations.
- * 
+ *
  * Revision 1.288  1994/11/27  23:12:28  matt
  * Made changes for new mprintf calling convention
- * 
+ *
  * Revision 1.287  1994/11/27  20:35:50  matt
  * Fixed dumb mistake
- * 
+ *
  * Revision 1.286  1994/11/27  20:30:52  matt
  * Got rid of warning
- * 
+ *
  * Revision 1.285  1994/11/21  11:43:21  mike
  * ndebug stuff.
- * 
+ *
  * Revision 1.284  1994/11/19  15:19:37  mike
  * rip out unused code and data.
- * 
+ *
  * Revision 1.283  1994/11/18  23:41:59  john
  * Changed some shorts to ints.
- * 
+ *
  * Revision 1.282  1994/11/18  16:16:17  mike
  * Separate depth on objects vs. walls.
- * 
+ *
  * Revision 1.281  1994/11/18  12:05:35  rob
  * Removed unnecessary invulnerability flag set in player death.
  * (I hope its unnecessary.. its commented out if it proves crucial)
  * fixes powerup dropping bug for net play.
- * 
+ *
  * Revision 1.280  1994/11/16  20:36:34  rob
  * Changed player explosion (small) code.
- * 
+ *
  * Revision 1.279  1994/11/16  18:26:04  matt
  * Clear tmap override on player, to fix "rock ship" bug
- * 
+ *
  * Revision 1.278  1994/11/16  14:54:12  rob
  * Moved hook for network explosions.
- * 
+ *
  * Revision 1.277  1994/11/14  11:40:42  mike
  * plot inner polygon on laser based on detail level.
- * 
+ *
  * Revision 1.276  1994/11/10  14:02:59  matt
  * Hacked in support for player ships with different textures
- * 
+ *
  * Revision 1.275  1994/11/08  12:19:08  mike
  * Make a generally useful function for putting small explosions on any object.
- * 
+ *
  * Revision 1.274  1994/11/04  19:55:54  rob
  * Changed calls to player_explode to accomodate new parameter.
- * 
+ *
  * Revision 1.273  1994/11/02  21:54:27  matt
  * Delete the camera when the death sequence is done
- * 
+ *
  * Revision 1.272  1994/11/02  11:36:35  rob
  * Added player-in-process-of-dying explosions to network play.
- * 
+ *
  * Revision 1.271  1994/10/31  17:25:33  matt
  * Fixed cloaked bug
- * 
+ *
  * Revision 1.270  1994/10/31  16:11:19  allender
  * on demo recording, store letterbox mode in demo.
- * 
+ *
  * Revision 1.269  1994/10/31  10:36:18  mike
  * Make cloak effect fadein/fadeout different for robots versus player.
- * 
+ *
  * Revision 1.268  1994/10/30  14:11:44  mike
  * rip out repair center stuff.
- * 
+ *
  * Revision 1.267  1994/10/28  19:43:52  mike
  * Boss cloaking effect.
- * 
+ *
  * Revision 1.266  1994/10/27  11:33:42  mike
  * Add Highest_ever_object_index -- high water mark in object creation.
- * 
+ *
  * Revision 1.265  1994/10/25  10:51:12  matt
  * Vulcan cannon powerups now contain ammo count
- * 
+ *
  * Revision 1.264  1994/10/24  20:49:24  matt
  * Made cloaked objects pulse
- * 
+ *
  * Revision 1.263  1994/10/21  12:19:45  matt
  * Clear transient objects when saving (& loading) games
- * 
+ *
  * Revision 1.262  1994/10/21  11:25:23  mike
  * Use new constant IMMORTAL_TIME.
- * 
+ *
  * Revision 1.261  1994/10/19  16:50:35  matt
  * If out of segment, put player in center of segment when checking objects
- * 
- * 
+ *
+ *
  * Revision 1.260  1994/10/17  23:21:55  mike
  * Clean up robot cloaking, move more to ai.c
- * 
+ *
  * Revision 1.259  1994/10/17  21:34:49  matt
  * Added support for new Control Center/Main Reactor
- * 
+ *
  * Revision 1.258  1994/10/17  21:18:04  mike
  * robot cloaking.
- * 
+ *
  * Revision 1.257  1994/10/17  14:12:23  matt
  * Cleaned up problems with player dying from mine explosion
- * 
+ *
  * Revision 1.256  1994/10/15  19:04:31  mike
  * Don't remove proximity bombs after you die.
- * 
+ *
  * Revision 1.255  1994/10/14  15:57:00  mike
  * Don't show ids in network mode.
  * Fix, I hope, but in death sequence.
- * 
+ *
  * Revision 1.254  1994/10/12  08:04:29  mike
  * Don't decloak player on death.
- * 
+ *
  * Revision 1.253  1994/10/11  20:36:16  matt
  * Clear "transient" objects (weapons,explosions,etc.) when starting a level
- * 
+ *
  * Revision 1.252  1994/10/11  12:24:09  matt
  * Cleaned up/change badass explosion calls
- * 
+ *
  * Revision 1.251  1994/10/08  19:30:20  matt
  * Fixed (I hope) a bug in cloaking of multiplayer objects
- * 
+ *
  * Revision 1.250  1994/10/08  14:03:15  rob
  * Changed cloaking routine.
- * 
+ *
  * Revision 1.249  1994/10/07  22:17:27  mike
  * Asserts on valid segnum.
- * 
+ *
  * Revision 1.248  1994/10/07  19:11:14  matt
  * Added cool cloak transition effect
- * 
+ *
  */
 
 /*
@@ -347,7 +347,7 @@ static char rcsid[] = "$Id: object.c 1.5 1995/10/26 14:08:03 allender Exp $";
 
 #include "object.h"
 #include "physics.h"
-//#include "slew.h"		
+//#include "slew.h"
 #include "render.h"
 #include "wall.h"
 #include "vclip.h"
@@ -467,7 +467,7 @@ void object_goto_next_viewer()
 	int i, start_obj = 0;
 
 	start_obj = Viewer - Objects;		//get viewer object number
-	
+
 	for (i=0;i<=Highest_object_index;i++) {
 
 		start_obj++;
@@ -491,7 +491,7 @@ ITCM_CODE void draw_object_blob(object *obj,bitmap_index bmi)
 
 	if (bm->bm_w > bm->bm_h)
 		g3_draw_bitmap(&obj->pos,obj->size,fixmuldiv(obj->size,bm->bm_h,bm->bm_w),bm);
-	else 
+	else
 		g3_draw_bitmap(&obj->pos,fixmuldiv(obj->size,bm->bm_w,bm->bm_h),obj->size,bm);
 }
 
@@ -598,7 +598,7 @@ ITCM_CODE void draw_cloaked_object(object *obj,fix light,fix *glow,fix cloak_sta
 		}
 
 		cloak_value = CLOAKED_FADE_LEVEL - cloak_delta;
-	
+
 	} else if (GameTime < cloak_end_time-Cloak_fadeout_duration/2) {
 
 		cloak_value = f2i((total_cloaked_time - Cloak_fadeout_duration/2 - cloak_delta_time) * CLOAKED_FADE_LEVEL);
@@ -615,16 +615,16 @@ ITCM_CODE void draw_cloaked_object(object *obj,fix light,fix *glow,fix cloak_sta
 
 		new_light = fixmul(light,light_scale);
 		new_glow = fixmul(*glow,light_scale);
-glPolyFmt (POLY_ALPHA (31) | POLY_CULL_NONE); // bah, ds can't do backface culling properly
+//glPolyFmt (POLY_ALPHA (31) | POLY_CULL_NONE); // bah, ds can't do backface culling properly
 		draw_polygon_model(&obj->pos,&obj->orient,obj->rtype.pobj_info.anim_angles,obj->rtype.pobj_info.model_num,obj->rtype.pobj_info.subobj_flags,new_light,&new_glow, (bitmap_index *)alt_tmap );
-glPolyFmt (POLY_ALPHA (31) | POLY_CULL_BACK); // bah, ds can't do backface culling properly
+//glPolyFmt (POLY_ALPHA (31) | POLY_CULL_BACK); // bah, ds can't do backface culling properly
 	}
 	else {
-		glPolyFmt (POLY_ALPHA (31 - cloak_value) | POLY_CULL_NONE);
+//		glPolyFmt (POLY_ALPHA (31 - cloak_value) | POLY_CULL_NONE);
 		g3_draw_tmap_func = (g3_draw_tmap_func_t)g3_draw_tmap_flat;
 		draw_polygon_model(&obj->pos,&obj->orient,obj->rtype.pobj_info.anim_angles,obj->rtype.pobj_info.model_num,obj->rtype.pobj_info.subobj_flags,light,glow, (bitmap_index *)alt_tmap );
 		g3_draw_tmap_func = (g3_draw_tmap_func_t)g3_draw_tmap_tex;
-		glPolyFmt (POLY_ALPHA (31) | POLY_CULL_BACK);
+//		glPolyFmt (POLY_ALPHA (31) | POLY_CULL_BACK);
 	}
 
 }
@@ -667,13 +667,13 @@ ITCM_CODE void draw_polygon_object(object *obj)
 		for (i=0;i<pm->n_textures;i++)
 			bm_ptrs[i] = Textures[obj->rtype.pobj_info.tmap_override];
 
-glPolyFmt (POLY_ALPHA (31) | POLY_CULL_NONE); // bah, ds can't do backface culling properly
+//glPolyFmt (POLY_ALPHA (31) | POLY_CULL_NONE); // bah, ds can't do backface culling properly
 		draw_polygon_model(&obj->pos,&obj->orient,obj->rtype.pobj_info.anim_angles,obj->rtype.pobj_info.model_num,obj->rtype.pobj_info.subobj_flags,light,&engine_glow_value,bm_ptrs);
-glPolyFmt (POLY_ALPHA (31) | POLY_CULL_BACK); // bah, ds can't do backface culling properly
+//glPolyFmt (POLY_ALPHA (31) | POLY_CULL_BACK); // bah, ds can't do backface culling properly
 	}
 	else {
 			ushort * alt_textures = NULL;
-	
+
 			#ifdef NETWORK
 			if ( obj->rtype.pobj_info.alt_textures > 0 )
 				alt_textures = (ushort *)(multi_player_textures[obj->rtype.pobj_info.alt_textures-1]);
@@ -690,19 +690,19 @@ glPolyFmt (POLY_ALPHA (31) | POLY_CULL_BACK); // bah, ds can't do backface culli
 
 			if (obj->type == OBJ_WEAPON && (Weapon_info[obj->id].model_num_inner > -1 )) {
 				fix dist_to_eye = vm_vec_dist_quick(&Viewer->pos, &obj->pos);
-				glPolyFmt (POLY_ALPHA (15) | POLY_CULL_NONE);
+//				glPolyFmt (POLY_ALPHA (15) | POLY_CULL_NONE);
 				draw_polygon_model(&obj->pos,&obj->orient,obj->rtype.pobj_info.anim_angles,obj->rtype.pobj_info.model_num,obj->rtype.pobj_info.subobj_flags,light,&engine_glow_value,(bitmap_index *)alt_textures);
 				if (dist_to_eye < Simple_model_threshhold_scale * F1_0*2)
 				{
 					draw_polygon_model(&obj->pos,&obj->orient,obj->rtype.pobj_info.anim_angles,Weapon_info[obj->id].model_num_inner,obj->rtype.pobj_info.subobj_flags,light,&engine_glow_value,(bitmap_index *)alt_textures);
 				}
-				glPolyFmt (POLY_ALPHA (31) | POLY_CULL_BACK);
+//				glPolyFmt (POLY_ALPHA (31) | POLY_CULL_BACK);
 			}
 			else
 			{
-glPolyFmt (POLY_ALPHA (31) | POLY_CULL_NONE); // bah, ds can't do backface culling properly
+//glPolyFmt (POLY_ALPHA (31) | POLY_CULL_NONE); // bah, ds can't do backface culling properly
 				draw_polygon_model(&obj->pos,&obj->orient,obj->rtype.pobj_info.anim_angles,obj->rtype.pobj_info.model_num,obj->rtype.pobj_info.subobj_flags,light,&engine_glow_value,(bitmap_index *)alt_textures);
-glPolyFmt (POLY_ALPHA (31) | POLY_CULL_BACK); // bah, ds can't do backface culling properly
+//glPolyFmt (POLY_ALPHA (31) | POLY_CULL_BACK); // bah, ds can't do backface culling properly
 			}
 		}
 	}
@@ -718,7 +718,7 @@ glPolyFmt (POLY_ALPHA (31) | POLY_CULL_BACK); // bah, ds can't do backface culli
 // the closet-robots list, it just sticks that object into the list along with its distance.
 // If the list already contains 3 robots, then it finds the robot in that list that is
 // farthest from the viewer. If that object is farther than the object currently being
-// rendered, then the new object takes over that far object's slot.  *Then* after all 
+// rendered, then the new object takes over that far object's slot.  *Then* after all
 // objects are rendered, object_render_targets is called an it draws a target on top
 // of all the objects.
 
@@ -731,14 +731,14 @@ glPolyFmt (POLY_ALPHA (31) | POLY_CULL_BACK); // bah, ds can't do backface culli
 //091494: set_close_objects(object *obj)
 //091494: {
 //091494: 	fix dist;
-//091494: 
-//091494: 	if ( (obj->type != OBJ_ROBOT) || (Object_draw_lock_boxes==0) )	
+//091494:
+//091494: 	if ( (obj->type != OBJ_ROBOT) || (Object_draw_lock_boxes==0) )
 //091494: 		return;
-//091494: 
-//091494: 	// The following code keeps a list of the 10 closest robots to the 
+//091494:
+//091494: 	// The following code keeps a list of the 10 closest robots to the
 //091494: 	// viewer.  See comments in front of this function for how this works.
 //091494: 	dist = vm_vec_dist( &obj->pos, &Viewer->pos );
-//091494: 	if ( dist < i2f(20*10) )	{				
+//091494: 	if ( dist < i2f(20*10) )	{
 //091494: 		if ( Object_num_close < MAX_CLOSE_ROBOTS )	{
 //091494: 			Object_close_ones[Object_num_close] = obj;
 //091494: 			Object_close_distance[Object_num_close] = dist;
@@ -755,7 +755,7 @@ glPolyFmt (POLY_ALPHA (31) | POLY_CULL_BACK); // bah, ds can't do backface culli
 //091494: 					farthest_robot = i;
 //091494: 				}
 //091494: 			}
-//091494: 			// If this object is closer to the viewer than 
+//091494: 			// If this object is closer to the viewer than
 //091494: 			// the farthest in the list, replace the farthest with this object.
 //091494: 			if ( farthest_distance > dist )	{
 //091494: 				Object_close_ones[farthest_robot] = obj;
@@ -856,7 +856,7 @@ void create_vclip_on_object(object *objp, fix size_scale, int vclip_num)
 }
 
 // -- mk, 02/05/95 -- #define	VCLIP_INVULNERABILITY_EFFECT	VCLIP_SMALL_EXPLOSION
-// -- mk, 02/05/95 -- 
+// -- mk, 02/05/95 --
 // -- mk, 02/05/95 -- // -----------------------------------------------------------------------------
 // -- mk, 02/05/95 -- void do_player_invulnerability_effect(object *objp)
 // -- mk, 02/05/95 -- {
@@ -871,7 +871,7 @@ ITCM_CODE void render_object(object *obj)
 {
 	int	mld_save;
 
-	if ( obj == Viewer ) return;		
+	if ( obj == Viewer ) return;
 
 	if ( obj->type==OBJ_NONE )	{
 		#ifndef NDEBUG
@@ -890,7 +890,7 @@ ITCM_CODE void render_object(object *obj)
 
 		case RT_POLYOBJ:
 
-			draw_polygon_object(obj); 
+			draw_polygon_object(obj);
 
 			//"warn" robot if being shot at
 			if (obj->type == OBJ_ROBOT)
@@ -939,12 +939,12 @@ ITCM_CODE void render_object(object *obj)
 //091494: 	ubyte codes;
 //091494: 	int i;
 //091494: 	int radius,x,y;
-//091494: 
-//091494: 	if (Object_draw_lock_boxes==0) 
+//091494:
+//091494: 	if (Object_draw_lock_boxes==0)
 //091494: 		return;
-//091494: 
+//091494:
 //091494: 	for (i=0; i<Object_num_close; i++ )	{
-//091494: 			
+//091494:
 //091494: 		codes = g3_rotate_point(&pt, &Object_close_ones[i]->pos );
 //091494: 		if ( !(codes & CC_BEHIND) )	{
 //091494: 			g3_project_point(&pt);
@@ -969,14 +969,14 @@ ITCM_CODE void render_object(object *obj)
 //--unused-- 	int x,y;
 //--unused-- 	int w, h, aw;
 //--unused-- 	char s[20], *s1;
-//--unused-- 
+//--unused--
 //--unused-- 	s1 = network_get_player_name( obj-Objects );
-//--unused-- 
+//--unused--
 //--unused-- 	if (s1)
 //--unused-- 		sprintf( s, "%s", s1 );
 //--unused-- 	else
 //--unused-- 		sprintf( s, "<%d>", obj->id );
-//--unused-- 
+//--unused--
 //--unused-- 	codes = g3_rotate_point(&pt, &obj->pos );
 //--unused-- 	if ( !(codes & CC_BEHIND) )	{
 //--unused-- 		g3_project_point(&pt);
@@ -1073,7 +1073,7 @@ void init_objects()
 	num_objects = 1;						//just the player
 	Highest_object_index = 0;
 
-	
+
 }
 
 //after calling init_object(), the network code has grabbed specific
@@ -1178,7 +1178,7 @@ void remove_all_objects_but( int segnum, int objnum )
 int check_duplicate_objects()
 {
 	int i, count=0;
-	
+
 	for (i=0;i<=Highest_object_index;i++) {
 		if ( Objects[i].type != OBJ_NONE )	{
 			count = search_all_segments_for_object( i );
@@ -1223,14 +1223,14 @@ void obj_link(int objnum,int segnum)
 	Assert(segnum>=0 && segnum<=Highest_segment_index);
 
 	obj->segnum = segnum;
-	
+
 	obj->next = Segments[segnum].objects;
 	obj->prev = -1;
 
 	Segments[segnum].objects = objnum;
 
 	if (obj->next != -1) Objects[obj->next].prev = objnum;
-	
+
 	//list_seg_objects( segnum );
 	//check_duplicate_objects();
 
@@ -1434,13 +1434,13 @@ int obj_create(ubyte type,ubyte id,int segnum,vms_vector *pos,
 
 	// Find next free object
 	objnum = obj_allocate();
-	
+
     object_rendered_last[objnum] = FrameCount;
 
 	if (objnum == -1)		//no free objects
 		return -1;
 
-	Assert(Objects[objnum].type == OBJ_NONE);		//make sure unused 
+	Assert(Objects[objnum].type == OBJ_NONE);		//make sure unused
 
 	obj = &Objects[objnum];
 
@@ -1457,7 +1457,7 @@ int obj_create(ubyte type,ubyte id,int segnum,vms_vector *pos,
 	obj->pos 					= *pos;
 	obj->size 					= size;
 	obj->flags 					= 0;
-	if (orient != NULL) 
+	if (orient != NULL)
 		obj->orient 			= *orient;
 
 	obj->control_type 		= ctype;
@@ -1510,7 +1510,7 @@ int obj_create(ubyte type,ubyte id,int segnum,vms_vector *pos,
 		obj->ctype.expl_info.next_attach = obj->ctype.expl_info.prev_attach = obj->ctype.expl_info.attach_parent = -1;
 
 	#ifndef NDEBUG
-	if (print_object_info)	
+	if (print_object_info)
 		mprintf( (0, "Created object %d of type %d\n", objnum, obj->type ));
 	#endif
 
@@ -1631,7 +1631,7 @@ void dead_player_end(void)
 }
 
 //	------------------------------------------------------------------------------------------------------------------
-//	Camera is less than size of player away from 
+//	Camera is less than size of player away from
 void set_camera_pos(vms_vector *camera_pos, object *objp)
 {
 	int	count = 0;
@@ -1708,7 +1708,7 @@ void dead_player_frame(void)
 				mprintf((1, "Can't create dead player camera.\n"));
 				Int3();
 			}
-		}		
+		}
 
 		ConsoleObject->mtype.phys_info.rotvel.x = max(0, DEATH_SEQUENCE_EXPLODE_TIME - time_dead)/4;
 		ConsoleObject->mtype.phys_info.rotvel.y = max(0, DEATH_SEQUENCE_EXPLODE_TIME - time_dead)/2;
@@ -1825,12 +1825,12 @@ void start_player_death_sequence(object *player)
 	Death_sequence_aborted = 0;
 
 	#ifdef NETWORK
-	if (Game_mode & GM_MULTI) 
+	if (Game_mode & GM_MULTI)
 	{
 		multi_send_kill(Players[Player_num].objnum);
 	}
 	#endif
-	
+
 	PaletteRedAdd = 40;
 	Player_is_dead = 1;
 	Players[Player_num].flags &= ~(PLAYER_FLAGS_AFTERBURNER);
@@ -1890,7 +1890,7 @@ void obj_delete_all_that_should_be_dead()
 									// Ok to continue, won't start death sequence again!
 					// kill_player();
 				}
-			} else {					
+			} else {
 				obj_delete(i);
 			}
 		}
@@ -1909,7 +1909,7 @@ void obj_relink(int objnum,int newsegnum)
 	obj_unlink(objnum);
 
 	obj_link(objnum,newsegnum);
-	
+
 #ifndef NDEBUG
 	if (get_seg_masks(&Objects[objnum].pos,Objects[objnum].segnum,0).centermask!=0)
 		mprintf((1, "obj_relink violates seg masks.\n"));
@@ -1940,7 +1940,7 @@ void spin_object(object *obj)
 //move an object for the current frame
 void object_move_one( object * obj )
 {
-	
+
 	#ifndef DEMO_ONLY
 
 	int	previous_segment = obj->segnum;
@@ -1975,7 +1975,7 @@ void object_move_one( object * obj )
 		case CT_REPAIRCEN: Int3();	// -- hey! these are no longer supported!! -- do_repair_sequence(obj); break;
 
 		case CT_POWERUP: do_powerup_frame(obj); break;
-	
+
 		case CT_MORPH:			//morph implies AI
 			do_morph_frame(obj);
 			//NOTE: FALLS INTO AI HERE!!!!
@@ -1996,7 +1996,7 @@ void object_move_one( object * obj )
 		case CT_SLEW:
 			if ( keyd_pressed[KEY_PAD5] ) slew_stop( obj );
 			if ( keyd_pressed[KEY_NUMLOCK] ) 		{
-				slew_reset_orient( obj ); 
+				slew_reset_orient( obj );
 				* (ubyte *) 0x417 &= ~0x20;		//kill numlock
 			}
 			slew_frame(0 );		// Does velocity addition for us.
@@ -2041,7 +2041,7 @@ void object_move_one( object * obj )
 		case MT_PHYSICS:		//do_physics_sim(obj);	break;	//move by physics
 		{
 			int objnum = obj - Objects;
-			
+
 			if ( ((obj->type == OBJ_WEAPON) && (obj->ctype.laser_info.parent_num==Players[Player_num].objnum)) ||
 				  (objnum == Players[Player_num].objnum) ) {
 				do_physics_sim(obj);
@@ -2062,7 +2062,7 @@ void object_move_one( object * obj )
 				do_physics_sim(obj);
 		}
 		break;
-		
+
 		case MT_SPINNING:		spin_object(obj); break;
 
 	}
@@ -2142,9 +2142,9 @@ void object_move_all()
 //--unused-- {
 //--unused-- 	for (i=MAX_OBJECTS;--i>=0;)
 //--unused-- 		if (Objects[i].type != OBJ_NONE) break;
-//--unused-- 
+//--unused--
 //--unused-- 	return i;
-//--unused-- 
+//--unused--
 //--unused-- }
 
 
@@ -2181,14 +2181,14 @@ void compress_objects(void)
 			while (Objects[--Highest_object_index].type == OBJ_NONE);
 
 			//last_i = find_last_obj(last_i);
-			
+
 		}
 
 	reset_objects(num_objects);
 
 }
 
-//called after load.  Takes number of objects,  and objects should be 
+//called after load.  Takes number of objects,  and objects should be
 //compressed.  resets free list, marks unused objects as unused
 void reset_objects(int n_objs)
 {
@@ -2218,7 +2218,7 @@ int find_object_seg(object * obj )
 
 //If an object is in a segment, set its segnum field and make sure it's
 //properly linked.  If not in any segment, returns 0, else 1.
-//callers should generally use find_vector_intersection()  
+//callers should generally use find_vector_intersection()
 int update_object_seg(object * obj )
 {
 	int newseg;
@@ -2254,19 +2254,19 @@ void fix_object_segs()
 //--unused-- {
 //--unused-- 	int i, segnum;
 //--unused-- 	object *obj;
-//--unused-- 
+//--unused--
 //--unused-- 	// First, unlink all the old objects for the segments array
 //--unused-- 	for (segnum=0; segnum <= Highest_segment_index; segnum++) {
 //--unused-- 		Segments[segnum].objects = -1;
 //--unused-- 	}
 //--unused-- 	// Then, erase all the objects
 //--unused-- 	reset_objects(1);
-//--unused-- 
+//--unused--
 //--unused-- 	// Fill in the object array
 //--unused-- 	memcpy( Objects, new_list, sizeof(object)*MAX_OBJECTS );
-//--unused-- 
+//--unused--
 //--unused-- 	Highest_object_index=-1;
-//--unused-- 
+//--unused--
 //--unused-- 	// Relink 'em
 //--unused-- 	for (i=0; i<MAX_OBJECTS; i++ )	{
 //--unused-- 		obj = &Objects[i];
@@ -2280,7 +2280,7 @@ void fix_object_segs()
 //--unused-- 			obj->next = obj->prev = obj->segnum = -1;
 //--unused-- 		}
 //--unused-- 	}
-//--unused-- 	
+//--unused--
 //--unused-- }
 
 //delete objects, such as weapons & explosions, that shouldn't stay between levels
@@ -2289,7 +2289,7 @@ void fix_object_segs()
 void clear_transient_objects(int clear_all)
 {
 	int objnum;
-	object *obj; 
+	object *obj;
 
 	for (objnum=0,obj=&Objects[0];objnum<=Highest_object_index;objnum++,obj++)
 		if (((obj->type == OBJ_WEAPON) && (clear_all || obj->id != PROXIMITY_ID)) ||

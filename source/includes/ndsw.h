@@ -16,8 +16,8 @@
 #define KEY_Y		nds_KEY_Y
 #define PCXHeader	nds_PCXHeader
 #define rgb			nds_rgb
-#include <nds.h>
-#include <fat.h>
+//#include <nds.h>
+//#include <fat.h>
 #undef rgb
 #undef PCXHeader
 #undef KEY_A

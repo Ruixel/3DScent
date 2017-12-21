@@ -98,7 +98,416 @@
 		<Unit filename="resources/banner.png" />
 		<Unit filename="resources/icon.png" />
 		<Unit filename="resources/template.rsf" />
-		<Unit filename="source/main.cpp" />
+		<Unit filename="source/2d/2SCANLIN.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/2d/BITBLT.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/2d/BITMAP.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/2d/BOX.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/2d/CANVAS.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/2d/CLIP.h" />
+		<Unit filename="source/2d/DISC.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/2d/EFFECT2D.h" />
+		<Unit filename="source/2d/FONT.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/2d/GPIXEL.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/2d/GR.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/2d/GR.h" />
+		<Unit filename="source/2d/GRDEF.h" />
+		<Unit filename="source/2d/IBITBLT.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/2d/IBITBLT.h" />
+		<Unit filename="source/2d/LINE.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/2d/PALETTE.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/2d/PALETTE.h" />
+		<Unit filename="source/2d/PCX.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/2d/PCX.h" />
+		<Unit filename="source/2d/PIXEL.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/2d/RECT.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/2d/RLE.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/2d/RLE.h" />
+		<Unit filename="source/2d/SCALE.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/3d/3D.h" />
+		<Unit filename="source/3d/CLIPPER.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/3d/CLIPPER.h" />
+		<Unit filename="source/3d/DRAW.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/3d/GLOBVARS.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/3d/GLOBVARS.h" />
+		<Unit filename="source/3d/INSTANCE.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/3d/INTERP.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/3d/MATRIX.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/3d/POINTS.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/3d/ROD.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/3d/SETUP.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/bios/JOY.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/bios/JOY.h" />
+		<Unit filename="source/bios/KEY.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/bios/KEY.h" />
+		<Unit filename="source/bios/MONO.h" />
+		<Unit filename="source/bios/MOUSE.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/bios/MOUSE.h" />
+		<Unit filename="source/bios/TIMER.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/bios/TIMER.h" />
+		<Unit filename="source/bios/ndsfunc.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/bios/ndsfunc.h" />
+		<Unit filename="source/cfile/CFILE.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/cfile/CFILE.h" />
+		<Unit filename="source/fix/FIX.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/fix/FIX.h" />
+		<Unit filename="source/fix/TABLES.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/iff/IFF.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/iff/IFF.h" />
+		<Unit filename="source/includes/TYPES.h" />
+		<Unit filename="source/includes/ndsw.h" />
+		<Unit filename="source/main/AI.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/AI.h" />
+		<Unit filename="source/main/AIPATH.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/AISTRUCT.h" />
+		<Unit filename="source/main/ARGS.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/ARGS.h" />
+		<Unit filename="source/main/AUTOMAP.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/AUTOMAP.h" />
+		<Unit filename="source/main/BM.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/BM.h" />
+		<Unit filename="source/main/CNTRLCEN.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/CNTRLCEN.h" />
+		<Unit filename="source/main/COLLIDE.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/COLLIDE.h" />
+		<Unit filename="source/main/COMPBIT.h" />
+		<Unit filename="source/main/CONFIG.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/CONFIG.h" />
+		<Unit filename="source/main/CONTROLS.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/CONTROLS.h" />
+		<Unit filename="source/main/CREDITS.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/CREDITS.h" />
+		<Unit filename="source/main/DESC_ID.h" />
+		<Unit filename="source/main/DIGI.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/DIGI.h" />
+		<Unit filename="source/main/EFFECTS.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/EFFECTS.h" />
+		<Unit filename="source/main/ENDLEVEL.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/ENDLEVEL.h" />
+		<Unit filename="source/main/FIREBALL.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/FIREBALL.h" />
+		<Unit filename="source/main/FUELCEN.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/FUELCEN.h" />
+		<Unit filename="source/main/FVI.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/FVI.h" />
+		<Unit filename="source/main/GAME.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/GAME.h" />
+		<Unit filename="source/main/GAMEFONT.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/GAMEFONT.h" />
+		<Unit filename="source/main/GAMEMINE.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/GAMEMINE.h" />
+		<Unit filename="source/main/GAMESAVE.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/GAMESAVE.h" />
+		<Unit filename="source/main/GAMESEG.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/GAMESEG.h" />
+		<Unit filename="source/main/GAMESEQ.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/GAMESEQ.h" />
+		<Unit filename="source/main/GAUGES.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/GAUGES.h" />
+		<Unit filename="source/main/HOSTAGE.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/HOSTAGE.h" />
+		<Unit filename="source/main/HUD.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/INFERNO.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/INFERNO.h" />
+		<Unit filename="source/main/JOYDEFS.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/JOYDEFS.h" />
+		<Unit filename="source/main/KCONFIG.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/KCONFIG.h" />
+		<Unit filename="source/main/KMATRIX.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/KMATRIX.h" />
+		<Unit filename="source/main/LASER.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/LASER.h" />
+		<Unit filename="source/main/LIGHTING.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/LIGHTING.h" />
+		<Unit filename="source/main/MENU.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/MENU.h" />
+		<Unit filename="source/main/MGLOBAL.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/MISSION.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/MISSION.h" />
+		<Unit filename="source/main/MORPH.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/MORPH.h" />
+		<Unit filename="source/main/MULTI.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/MULTI.h" />
+		<Unit filename="source/main/MULTIBOT.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/MULTIBOT.h" />
+		<Unit filename="source/main/NETMISC.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/NETMISC.h" />
+		<Unit filename="source/main/NETWORK.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/NETWORK.h" />
+		<Unit filename="source/main/NEWDEMO.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/NEWDEMO.h" />
+		<Unit filename="source/main/NEWMENU.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/NEWMENU.h" />
+		<Unit filename="source/main/OBJECT.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/OBJECT.h" />
+		<Unit filename="source/main/PAGING.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/PAGING.h" />
+		<Unit filename="source/main/PHYSICS.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/PHYSICS.h" />
+		<Unit filename="source/main/PIGGY.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/PIGGY.h" />
+		<Unit filename="source/main/PLAYER.h" />
+		<Unit filename="source/main/PLAYSAVE.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/PLAYSAVE.h" />
+		<Unit filename="source/main/POLYOBJ.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/POLYOBJ.h" />
+		<Unit filename="source/main/POWERUP.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/POWERUP.h" />
+		<Unit filename="source/main/RENDER.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/RENDER.h" />
+		<Unit filename="source/main/ROBOT.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/ROBOT.h" />
+		<Unit filename="source/main/SCORES.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/SCORES.h" />
+		<Unit filename="source/main/SCREENS.h" />
+		<Unit filename="source/main/SEGMENT.h" />
+		<Unit filename="source/main/SEGPOINT.h" />
+		<Unit filename="source/main/SETTINGS.h" />
+		<Unit filename="source/main/SHIP.h" />
+		<Unit filename="source/main/SONGS.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/SONGS.h" />
+		<Unit filename="source/main/SOUNDS.h" />
+		<Unit filename="source/main/STATE.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/STATE.h" />
+		<Unit filename="source/main/SWITCH.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/SWITCH.h" />
+		<Unit filename="source/main/TERRAIN.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/TERRAIN.h" />
+		<Unit filename="source/main/TEXMERGE.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/TEXMERGE.h" />
+		<Unit filename="source/main/TEXT.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/TEXT.h" />
+		<Unit filename="source/main/TEXTURES.h" />
+		<Unit filename="source/main/TITLES.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/TITLES.h" />
+		<Unit filename="source/main/VCLIP.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/VCLIP.h" />
+		<Unit filename="source/main/VERS_ID.h" />
+		<Unit filename="source/main/WALL.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/WALL.h" />
+		<Unit filename="source/main/WEAPON.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/WEAPON.h" />
+		<Unit filename="source/main/adpcm.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/softkey.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/main/softkey.h" />
+		<Unit filename="source/mem/MEM.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/mem/MEM.h" />
+		<Unit filename="source/misc/ERROR.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/misc/ERROR.h" />
+		<Unit filename="source/misc/FILEUTIL.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/misc/FILEUTIL.h" />
+		<Unit filename="source/misc/MISC.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/misc/MISC.h" />
+		<Unit filename="source/misc/STRUTIL.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/vecmat/VECMAT.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="source/vecmat/VECMAT.h" />
 		<Extensions>
 			<code_completion />
 			<envvars />

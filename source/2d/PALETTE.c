@@ -7,7 +7,7 @@ IN USING, DISPLAYING,  AND CREATING DERIVATIVE WORKS THEREOF, SO LONG AS
 SUCH USE, DISPLAY OR CREATION IS FOR NON-COMMERCIAL, ROYALTY OR REVENUE
 FREE PURPOSES.  IN NO EVENT SHALL THE END-USER USE THE COMPUTER CODE
 CONTAINED HEREIN FOR REVENUE-BEARING PURPOSES.  THE END-USER UNDERSTANDS
-AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.  
+AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.
 COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
 */
 /*
@@ -21,127 +21,127 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
  * $Log: palette.c $
  * Revision 1.41  1995/02/02  14:26:31  john
  * Made palette fades work better with gamma thingy..
- * 
+ *
  * Revision 1.40  1994/12/08  19:03:46  john
  * Made functions use cfile.
- * 
+ *
  * Revision 1.39  1994/12/01  11:23:27  john
  * Limited Gamma from 0-8.
- * 
+ *
  * Revision 1.38  1994/11/28  01:31:08  mike
  * optimize color lookup function, caching recently used colors.
- * 
+ *
  * Revision 1.37  1994/11/18  22:50:18  john
  * Changed shorts to ints in parameters.
- * 
+ *
  * Revision 1.36  1994/11/15  17:54:59  john
  * Made text palette fade in when game over.
- * 
+ *
  * Revision 1.35  1994/11/10  19:53:14  matt
  * Fixed error handling is gr_use_palette_table()
- * 
+ *
  * Revision 1.34  1994/11/07  13:53:48  john
  * Added better gamma stufff.
- * 
+ *
  * Revision 1.33  1994/11/07  13:37:56  john
  * Added gamma correction stuff.
- * 
+ *
  * Revision 1.32  1994/11/05  13:20:14  john
  * Fixed bug with find_closest_color_current not working.
- * 
+ *
  * Revision 1.31  1994/11/05  13:08:09  john
  * MAde it return 0 when palette already faded out.
- * 
+ *
  * Revision 1.30  1994/11/05  13:05:34  john
  * Added back in code to allow keys during fade.
- * 
+ *
  * Revision 1.29  1994/11/05  12:49:50  john
  * Fixed bug with previous comment..
- * 
+ *
  * Revision 1.28  1994/11/05  12:48:46  john
  * Made palette only fade in / out when its supposed to.
- * 
+ *
  * Revision 1.27  1994/11/05  12:46:43  john
  * Changed palette stuff a bit.
- * 
+ *
  * Revision 1.26  1994/11/01  12:59:35  john
  * Reduced palette.256 size.
- * 
+ *
  * Revision 1.25  1994/10/26  23:55:35  john
  * Took out roller; Took out inverse table.
- * 
+ *
  * Revision 1.24  1994/10/04  22:03:05  matt
  * Fixed bug: palette wasn't fading all the way out or in
- * 
+ *
  * Revision 1.23  1994/09/22  16:08:40  john
  * Fixed some palette stuff.
- * 
+ *
  * Revision 1.22  1994/09/19  11:44:31  john
  * Changed call to allocate selector to the dpmi module.
- * 
+ *
  * Revision 1.21  1994/09/12  19:28:09  john
  * Fixed bug with unclipped fonts clipping.
- * 
+ *
  * Revision 1.20  1994/09/12  18:18:39  john
  * Set 254 and 255 to fade to themselves in fadetable
- * 
+ *
  * Revision 1.19  1994/09/12  14:40:10  john
  * Neatend.
- * 
+ *
  * Revision 1.18  1994/09/09  09:31:55  john
  * Made find_closest_color not look at superx spot of 254
- * 
+ *
  * Revision 1.17  1994/08/09  11:27:08  john
  * Add cthru stuff.
- * 
+ *
  * Revision 1.16  1994/08/01  11:03:51  john
  * MAde it read in old/new palette.256
- * 
+ *
  * Revision 1.15  1994/07/27  18:30:27  john
  * Took away the blending table.
- * 
+ *
  * Revision 1.14  1994/06/09  10:39:52  john
  * In fade out.in functions, returned 1 if key was pressed...
- * 
+ *
  * Revision 1.13  1994/05/31  19:04:16  john
  * Added key to stop fade if desired.
- * 
+ *
  * Revision 1.12  1994/05/06  12:50:20  john
  * Added supertransparency; neatend things up; took out warnings.
- * 
+ *
  * Revision 1.11  1994/05/03  19:39:02  john
  * *** empty log message ***
- * 
+ *
  * Revision 1.10  1994/04/22  11:16:07  john
  * *** empty log message ***
- * 
+ *
  * Revision 1.9  1994/04/08  16:59:40  john
  * Add fading poly's; Made palette fade 32 instead of 16.
- * 
+ *
  * Revision 1.8  1994/03/16  17:21:17  john
  * Added slow palette searching options.
- * 
+ *
  * Revision 1.7  1994/01/07  11:47:33  john
  * made use cflib
- * 
+ *
  * Revision 1.6  1993/12/21  11:41:04  john
  * *** empty log message ***
- * 
+ *
  * Revision 1.5  1993/12/09  15:02:47  john
  * Changed palette stuff majorly
- * 
+ *
  * Revision 1.4  1993/12/07  12:31:41  john
  * moved bmd_palette to gr_palette
- * 
+ *
  * Revision 1.3  1993/10/15  16:22:23  john
  * *** empty log message ***
- * 
+ *
  * Revision 1.2  1993/09/26  18:59:46  john
  * fade stuff
- * 
+ *
  * Revision 1.1  1993/09/08  11:44:03  john
  * Initial revision
- * 
+ *
  *
  */
 
@@ -156,12 +156,12 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
 #include "grdef.h"
 #include "cfile.h"
 #include "error.h"
-#include "mono.h"
+//#include "mono.h"
 #include "fix.h"
-#include "key.h"
+//#include "key.h"
 #include "palette.h"
 #include "misc.h"
-#include "ndsfunc.h"
+//#include "ndsfunc.h"
 
 ubyte gr_palette[256*3];
 ubyte gr_current_pal[256*3];
@@ -174,7 +174,7 @@ ubyte gr_palette_gamma = 0;
 int gr_palette_gamma_param = 0;
 ubyte gr_palette_faded_out = 1;
 
-extern u16	ds_palette[];
+//extern u16	ds_palette[];
 extern int	palette_updated;
 
 void gr_palette_set_gamma( int gamma )
@@ -187,7 +187,7 @@ void gr_palette_set_gamma( int gamma )
 		gr_palette_gamma = gamma;
 		if (!gr_palette_faded_out)
 			gr_palette_load( gr_palette );
-	}	
+	}
 }
 
 int gr_palette_get_gamma()
@@ -379,7 +379,7 @@ void gr_palette_step_up( int r, int g, int b )
 		else if (nb>63) nb=63;
 
 //		outp( 0x3c9, temp );
-		ds_palette[i] = (nr >> 1) | ((ng & ~1) << 4) | ((nb & ~1) << 9);
+//		ds_palette[i] = (nr >> 1) | ((ng & ~1) << 4) | ((nb & ~1) << 9);
 	}
 	palette_updated = 1;
 }
@@ -393,14 +393,14 @@ void gr_palette_clear()
 		outp( 0x3c9, 0 );
 	}
 */
-	for (i=0; i<256; i++)
-		ds_palette[i] = 0;
+//	for (i=0; i<256; i++)
+//		ds_palette[i] = 0;
 
 	gr_palette_faded_out = 1;
 	palette_updated = 1;
 }
 
-void gr_palette_load( ubyte * pal )	
+void gr_palette_load( ubyte * pal )
 {
 	int i, j;
 	ubyte r, g, b;
@@ -427,7 +427,7 @@ void gr_palette_load( ubyte * pal )
 		if ( b > 63 ) b = 63;
  		gr_current_pal[j] = pal[j];	j++;
 
-		ds_palette[i] = (r >> 1) | ((g & ~1) << 4) | ((b & ~1) << 9);
+//		ds_palette[i] = (r >> 1) | ((g & ~1) << 4) | ((b & ~1) << 9);
 	}
 	palette_updated = 1;
 	gr_palette_faded_out = 0;
@@ -437,7 +437,7 @@ void gr_palette_load( ubyte * pal )
 
 
 
-int gr_palette_fade_out(ubyte *pal, int nsteps, int allow_keys )	
+int gr_palette_fade_out(ubyte *pal, int nsteps, int allow_keys )
 {
 	ubyte r, g, b;
 	int i,j,l;
@@ -455,13 +455,13 @@ int gr_palette_fade_out(ubyte *pal, int nsteps, int allow_keys )
 //		gr_sync_display();
 /*		outp( 0x3c6, 0xff );
 		outp( 0x3c8, 0 );
-		for (i=0; i<768; i++ )	{		
+		for (i=0; i<768; i++ )	{
 			fade_palette[i] -= fade_palette_delta[i];
 			if (fade_palette[i] < 0 )
 				fade_palette[i] = 0;
 			c = f2i(fade_palette[i]);
 			if ( c > 63 ) c = 63;
-//			outp( 0x3c9, c );								
+//			outp( 0x3c9, c );
 		}
 */
 		for (i=0, j=0; i<256; i++)
@@ -483,7 +483,7 @@ int gr_palette_fade_out(ubyte *pal, int nsteps, int allow_keys )
 				fade_palette[j] = 0;
 			b = (ubyte)f2i (fade_palette[j++]);
 			if (b > 63) b = 63;
-			ds_palette[i] = (r >> 1) | ((g & ~1) << 4) | ((b & ~1) << 9);
+//			ds_palette[i] = (r >> 1) | ((g & ~1) << 4) | ((b & ~1) << 9);
 		}
 		palette_updated = 1;
 		bitblt_to_screen ();
@@ -492,7 +492,7 @@ int gr_palette_fade_out(ubyte *pal, int nsteps, int allow_keys )
 	return 0;
 }
 
-int gr_palette_fade_in(ubyte *pal, int nsteps, int allow_keys)	
+int gr_palette_fade_in(ubyte *pal, int nsteps, int allow_keys)
 {
 	int i,j,l;
 	ubyte r,g,b;
@@ -511,13 +511,13 @@ int gr_palette_fade_in(ubyte *pal, int nsteps, int allow_keys)
 //		gr_sync_display();
 /*		outp( 0x3c6, 0xff );
 		outp( 0x3c8, 0 );
-		for (i=0; i<768; i++ )	{		
+		for (i=0; i<768; i++ )	{
 			fade_palette[i] += fade_palette_delta[i];
 			if (fade_palette[i] > i2f(pal[i]+gr_palette_gamma) )
 				fade_palette[i] = i2f(pal[i]+gr_palette_gamma);
 			c = f2i(fade_palette[i]);
 			if ( c > 63 ) c = 63;
-			outp( 0x3c9, c );								
+			outp( 0x3c9, c );
 		}
 */
 		for (i=0, j=0; i<256; i++)
@@ -539,7 +539,7 @@ int gr_palette_fade_in(ubyte *pal, int nsteps, int allow_keys)
 				fade_palette[j] = i2f(pal[j]+gr_palette_gamma);
 			b = (ubyte)f2i (fade_palette[j++]);
 			if (b > 63) b = 63;
-			ds_palette[i] = (r >> 1) | ((g & ~1) << 4) | ((b & ~1) << 9);
+//			ds_palette[i] = (r >> 1) | ((g & ~1) << 4) | ((b & ~1) << 9);
 		}
 		palette_updated = 1;
 		bitblt_to_screen ();

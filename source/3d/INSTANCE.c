@@ -7,7 +7,7 @@ IN USING, DISPLAYING,  AND CREATING DERIVATIVE WORKS THEREOF, SO LONG AS
 SUCH USE, DISPLAY OR CREATION IS FOR NON-COMMERCIAL, ROYALTY OR REVENUE
 FREE PURPOSES.  IN NO EVENT SHALL THE END-USER USE THE COMPUTER CODE
 CONTAINED HEREIN FOR REVENUE-BEARING PURPOSES.  THE END-USER UNDERSTANDS
-AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.  
+AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.
 COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
 */
 /*
@@ -15,9 +15,9 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
  * $Revision: 1.2 $
  * $Author: allender $
  * $Date: 1995/06/12 12:36:57 $
- * 
+ *
  * Instancing routines
- * 
+ *
  * $Log: instance.c $
  * Revision 1.2  1995/06/12  12:36:57  allender
  * fixed bug where g3_start_instance_angles recursively called itself
@@ -27,8 +27,8 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
  *
  * Revision 1.1  1995/04/17  06:43:29  matt
  * Initial revision
- * 
- * 
+ *
+ *
  */
 /*
 #pragma off (unreferenced)
@@ -60,29 +60,29 @@ ITCM_CODE void g3_start_instance_matrix(vms_vector *pos,vms_matrix *orient)
 	instance_stack[instance_depth].p = View_position;
 	instance_depth++;
 
-	if (instance_depth == 1)
-		glPopMatrix (-1);
-	glPushMatrix ();
+	//if (instance_depth == 1)
+	//	glPopMatrix (-1);
+	//glPushMatrix ();
 
 	vm_vec_sub (&tempv, &View_position, pos);
 
 	if (orient)
 	{
-		MATRIX_MULT4x3 = orient->rvec.x >> 4;
+/*		MATRIX_MULT4x3 = orient->rvec.x >> 4;
 		MATRIX_MULT4x3 = orient->rvec.y >> 4;
 		MATRIX_MULT4x3 = orient->rvec.z >> 4;
-		
+
 		MATRIX_MULT4x3 = orient->uvec.x >> 4;
 		MATRIX_MULT4x3 = orient->uvec.y >> 4;
 		MATRIX_MULT4x3 = orient->uvec.z >> 4;
-		
+
 		MATRIX_MULT4x3 = orient->fvec.x >> 4;
 		MATRIX_MULT4x3 = orient->fvec.y >> 4;
 		MATRIX_MULT4x3 = orient->fvec.z >> 4;
 
 		MATRIX_MULT4x3 = pos->x >> 12;
 		MATRIX_MULT4x3 = pos->y >> 12;
-		MATRIX_MULT4x3 = pos->z >> 12;
+		MATRIX_MULT4x3 = pos->z >> 12;*/
 
 		vm_vec_rotate(&View_position,&tempv,orient);
 
@@ -93,9 +93,9 @@ ITCM_CODE void g3_start_instance_matrix(vms_vector *pos,vms_matrix *orient)
 	}
 	else
 	{
-		MATRIX_TRANSLATE = pos->x >> 12;
+/*		MATRIX_TRANSLATE = pos->x >> 12;
 		MATRIX_TRANSLATE = pos->y >> 12;
-		MATRIX_TRANSLATE = pos->z >> 12;
+		MATRIX_TRANSLATE = pos->z >> 12;*/
 	}
 }
 
@@ -120,14 +120,14 @@ ITCM_CODE void g3_done_instance()
 	View_position = instance_stack[instance_depth].p;
 	View_matrix = instance_stack[instance_depth].m;
 
-	glPopMatrix (1);
-	if (instance_depth == 0)
-		glPopMatrix (1);
+	//glPopMatrix (1);
+	//if (instance_depth == 0)
+	//	glPopMatrix (1);
 }
 
 #if 0
 //instance at specified point with specified orientation
-//if matrix==NULL, don't modify matrix.  This will be like doing an offset   
+//if matrix==NULL, don't modify matrix.  This will be like doing an offset
 ITCM_CODE void g3_start_instance_matrix(vms_vector *pos,vms_matrix *orient)
 {
 	vms_vector tempv;

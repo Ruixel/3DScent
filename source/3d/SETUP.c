@@ -7,7 +7,7 @@ IN USING, DISPLAYING,  AND CREATING DERIVATIVE WORKS THEREOF, SO LONG AS
 SUCH USE, DISPLAY OR CREATION IS FOR NON-COMMERCIAL, ROYALTY OR REVENUE
 FREE PURPOSES.  IN NO EVENT SHALL THE END-USER USE THE COMPUTER CODE
 CONTAINED HEREIN FOR REVENUE-BEARING PURPOSES.  THE END-USER UNDERSTANDS
-AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.  
+AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.
 COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
 */
 /*
@@ -15,9 +15,9 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
  * $Revision: 1.4 $
  * $Author: allender $
  * $Date: 1995/10/11 00:27:04 $
- * 
+ *
  * Setup for 3d library
- * 
+ *
  * $Log: setup.c $
  * Revision 1.4  1995/10/11  00:27:04  allender
  * bash free_num_points to 0
@@ -33,8 +33,8 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
  *
  * Revision 1.1  1995/04/17  03:59:01  matt
  * Initial revision
- * 
- * 
+ *
+ *
  */
 
 /*
@@ -50,7 +50,7 @@ static char rcsid[] = "$Id: setup.c 1.4 1995/10/11 00:27:04 allender Exp $";
 #include "globvars.h"
 #include "clipper.h"
 
-#include "ndsfunc.h"
+//#include "ndsfunc.h"
 
 //initialize the 3d system
 void g3_init(void)

@@ -7,7 +7,7 @@ IN USING, DISPLAYING,  AND CREATING DERIVATIVE WORKS THEREOF, SO LONG AS
 SUCH USE, DISPLAY OR CREATION IS FOR NON-COMMERCIAL, ROYALTY OR REVENUE
 FREE PURPOSES.  IN NO EVENT SHALL THE END-USER USE THE COMPUTER CODE
 CONTAINED HEREIN FOR REVENUE-BEARING PURPOSES.  THE END-USER UNDERSTANDS
-AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.  
+AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.
 COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
 */
 /*
@@ -15,9 +15,9 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
  * $Revision: 1.7 $
  * $Author: allender $
  * $Date: 1995/09/22 14:08:16 $
- * 
+ *
  * C version of fixed point library
- * 
+ *
  * $Log: fix.c $
  * Revision 1.7  1995/09/22  14:08:16  allender
  * fixed fix_atan2 to work correctly with doubles
@@ -44,8 +44,8 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
  * --- PC RCS Info ---
  * Revision 1.1  1995/03/08  18:55:09  matt
  * Initial revision
- * 
- * 
+ *
+ *
  */
 
 /*
@@ -59,7 +59,7 @@ static char rcsid[] = "$Id: fix.c 1.7 1995/09/22 14:08:16 allender Exp $";
 #include "error.h"
 #include "fix.h"
 
-#include "ndsw.h"
+#include "3ds.h"
 
 //extern ubyte guess_table[];
 extern short sincos_table[];
@@ -98,16 +98,8 @@ fix fixmul(fix a, fix b)
 ITCM_CODE long fixdivquadlong(quad q,ulong d)
 {
 #if 1
-	REG_DIVCNT = DIV_64_32;
 
-	while(REG_DIVCNT & DIV_BUSY);
-
-	REG_DIV_NUMER = q;
-	REG_DIV_DENOM_L = d;
-
-	while(REG_DIVCNT & DIV_BUSY);
-
-	return (REG_DIV_RESULT_L);
+	return q/d;
 #else
 	int i;
 	ulong tmp0;
@@ -124,14 +116,14 @@ ITCM_CODE long fixdivquadlong(quad q,ulong d)
 	if (M == 0)
 	{
 		for (i=0; i<32; i++ )   {
-	
+
 			r <<= 1;
 			r |= T;
 			T = ((nl&0x80000000L)!=0);
 			nl <<= 1;
-	
+
 			switch( Q ) {
-		
+
 			case 0:
 				Q = (unsigned char)((0x80000000L & nh) != 0 );
 				nh = (nh << 1) | (unsigned long)T;
@@ -163,14 +155,14 @@ ITCM_CODE long fixdivquadlong(quad q,ulong d)
 	else
 	{
 		for (i=0; i<32; i++ )   {
-	
+
 			r <<= 1;
 			r |= T;
 			T = ((nl&0x80000000L)!=0);
 			nl <<= 1;
-	
+
 			switch( Q ) {
-		
+
 			case 0:
 				Q = (unsigned char)((0x80000000L & nh) != 0 );
 				nh = (nh << 1) | (unsigned long)T;
@@ -183,7 +175,7 @@ ITCM_CODE long fixdivquadlong(quad q,ulong d)
 				else
 					Q = (unsigned char)(tmp1 == 0);
 				break;
-			case 1: 
+			case 1:
 				Q = (unsigned char)((0x80000000L & nh) != 0 );
 				nh = (nh << 1) | (unsigned long)T;
 
@@ -208,7 +200,7 @@ ITCM_CODE long fixdivquadlong(quad q,ulong d)
 
 ITCM_CODE fix fixdiv(fix a, fix b)
 {
-	REG_DIVCNT = DIV_64_32;
+	/*REG_DIVCNT = DIV_64_32;
 
 	while(REG_DIVCNT & DIV_BUSY);
 
@@ -217,13 +209,14 @@ ITCM_CODE fix fixdiv(fix a, fix b)
 
 	while(REG_DIVCNT & DIV_BUSY);
 
-	return (REG_DIV_RESULT_L);
+	return (REG_DIV_RESULT_L);*/
+	return (a << 16)/b;
 //	return fixdivquadlong(a<<16,a>>16,b);
 }
 
 ITCM_CODE fix fixmuldiv(fix a,fix b,fix c)
 {
-	REG_DIVCNT = DIV_64_32;
+	/*REG_DIVCNT = DIV_64_32;
 
 	while(REG_DIVCNT & DIV_BUSY);
 
@@ -232,7 +225,8 @@ ITCM_CODE fix fixmuldiv(fix a,fix b,fix c)
 
 	while(REG_DIVCNT & DIV_BUSY);
 
-	return (REG_DIV_RESULT_L);
+	return (REG_DIV_RESULT_L);*/
+	return (a*b)/c;
 }
 /*
 //multiply two fixes, then divide by a third, return a fix
@@ -243,7 +237,7 @@ fix fixmuldiv(fix a,fix b,fix c)
 	int neg;
 	ulong aa,bb;
 	ulong ah,al,bh,bl;
- 
+
 	neg = ((a^b) < 0);
 
 	aa = labs(a); bb = labs(b);
@@ -257,9 +251,9 @@ fix fixmuldiv(fix a,fix b,fix c)
 	old = q.low = al*bl;
 	q.low += (t<<16);
 	if (q.low < old) q.high++;
-	
+
 	q.high += ah*bh + (t>>16);
-	
+
 	if (neg)
 		fixquadnegate(&q);
 
@@ -299,11 +293,11 @@ ITCM_CODE fixang fix_atan2(fix cos,fix sin)
 
 }
 
-//computes the square root of a quad, returning a long 
+//computes the square root of a quad, returning a long
 ITCM_CODE ulong quad_sqrt(quad q)
 {
 #if 1
-	REG_SQRTCNT = SQRT_64;
+	/*REG_SQRTCNT = SQRT_64;
 
 	while(REG_SQRTCNT & SQRT_BUSY);
 
@@ -311,7 +305,8 @@ ITCM_CODE ulong quad_sqrt(quad q)
 
 	while(REG_SQRTCNT & SQRT_BUSY);
 
-	return REG_SQRT_RESULT;
+	return REG_SQRT_RESULT;*/
+	return sqrt(q);
 #else
 	long cnt,r,old_r,t;
 	quad tq;
@@ -324,7 +319,7 @@ ITCM_CODE ulong quad_sqrt(quad q)
 		cnt=4+16;
 	else
 		cnt=0+16;
-	
+
 	r = guess_table[(high>>cnt)&0xff]<<cnt;
 
 	//quad loop usually executed 4 times
@@ -340,7 +335,7 @@ ITCM_CODE ulong quad_sqrt(quad q)
 
 		if (t==r)	//got it!
 			return r;
- 
+
 		r = (t+r)/2;
 
 	} while (!(r==t || r==old_r));
@@ -357,7 +352,7 @@ ITCM_CODE ulong quad_sqrt(quad q)
 ITCM_CODE ushort long_sqrt(long a)
 {
 #if 1
-	REG_SQRTCNT = SQRT_32;
+	/*REG_SQRTCNT = SQRT_32;
 
 	while(REG_SQRTCNT & SQRT_BUSY);
 
@@ -365,7 +360,8 @@ ITCM_CODE ushort long_sqrt(long a)
 
 	while(REG_SQRTCNT & SQRT_BUSY);
 
-	return REG_SQRT_RESULT;
+	return REG_SQRT_RESULT;*/
+	return sqrt(a);
 #else
 	int cnt,r,old_r,t;
 
@@ -380,12 +376,12 @@ ITCM_CODE ushort long_sqrt(long a)
 		cnt=4;
 	else
 		cnt=0;
-	
+
 	r = guess_table[(a>>cnt)&0xff]<<cnt;
 
 	//the loop nearly always executes 3 times, so we'll unroll it 2 times and
 	//not do any checking until after the third time.  By my calcutations, the
-	//loop is executed 2 times in 99.97% of cases, 3 times in 93.65% of cases, 
+	//loop is executed 2 times in 99.97% of cases, 3 times in 93.65% of cases,
 	//four times in 16.18% of cases, and five times in 0.44% of cases.  It never
 	//executes more than five times.  By timing, I determined that is is faster
 	//to always execute three times and not check for termination the first two
@@ -403,7 +399,7 @@ ITCM_CODE ushort long_sqrt(long a)
 
 		if (t==r)	//got it!
 			return r;
- 
+
 		r = (t+r)/2;
 
 	} while (!(r==t || r==old_r));
@@ -502,7 +498,7 @@ ITCM_CODE fixang fix_acos(fix v)
 /*
 #define TABLE_SIZE 1024
 
-//for passed value a, returns 1/sqrt(a) 
+//for passed value a, returns 1/sqrt(a)
 fix fix_isqrt( fix a )
 {
 	int i, b = a;
@@ -528,6 +524,6 @@ fix fix_isqrt( fix a )
 		if ( old_r >= r ) return (r+old_r)/2;
 	}
 
-	return r;	
+	return r;
 }
 */

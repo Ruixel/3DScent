@@ -7,7 +7,7 @@ IN USING, DISPLAYING,  AND CREATING DERIVATIVE WORKS THEREOF, SO LONG AS
 SUCH USE, DISPLAY OR CREATION IS FOR NON-COMMERCIAL, ROYALTY OR REVENUE
 FREE PURPOSES.  IN NO EVENT SHALL THE END-USER USE THE COMPUTER CODE
 CONTAINED HEREIN FOR REVENUE-BEARING PURPOSES.  THE END-USER UNDERSTANDS
-AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.  
+AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.
 COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
 */
 /*
@@ -15,10 +15,10 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
  * $Revision: 1.10 $
  * $Author: allender $
  * $Date: 1995/08/14 14:26:34 $
- * 
+ *
  * Routines to do run length encoding/decoding
  * on bitmaps.
- * 
+ *
  * $Log: rle.c $
  * Revision 1.10  1995/08/14  14:26:34  allender
  * changed transparency color to 0
@@ -55,56 +55,56 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
  * --- PC RCS information ---
  * Revision 1.16  1994/11/30  00:55:03  mike
  * optimization
- * 
+ *
  * Revision 1.15  1994/11/24  13:24:44  john
  * Made sure that some rep movs had the cld set first.
  * Took some unused functions out.
- * 
+ *
  * Revision 1.14  1994/11/23  16:03:46  john
  * Fixed generic rle'ing to use new bit method.
- * 
+ *
  * Revision 1.13  1994/11/23  15:45:51  john
  * Changed to a 3 bit rle scheme.
- * 
+ *
  * Revision 1.12  1994/11/18  22:50:24  john
  * Changed shorts to ints in parameters.
- * 
+ *
  * Revision 1.11  1994/11/14  17:06:13  john
  * Took out Key_f12.
- * 
+ *
  * Revision 1.10  1994/11/14  15:54:09  john
  * Put code in for maybe checking bogus rle data.
- * 
+ *
  * Revision 1.9  1994/11/14  15:51:58  john
  * Added rle_disable_caching variable to prove the stability of my rle caching code
  * to any non-believers.
- * 
+ *
  * Revision 1.8  1994/11/10  10:31:20  john
  * Reduce cache buffers to 16.
- * 
+ *
  * Revision 1.7  1994/11/09  19:53:43  john
  * Added texture rle caching.
- * 
+ *
  * Revision 1.6  1994/11/09  17:41:44  john
  * Made a slow version of rle bitblt to svga, modex.
- * 
+ *
  * Revision 1.5  1994/11/09  17:07:50  john
  * Fixed bug with bitmap that gets bigger with rle.
- * 
+ *
  * Revision 1.4  1994/11/09  16:35:17  john
  * First version with working RLE bitmaps.
- * 
+ *
  * Revision 1.3  1994/10/26  12:54:47  john
- * Fixed bug with decode that used rep movsd instead of 
+ * Fixed bug with decode that used rep movsd instead of
  * rep stosd.
- * 
+ *
  * Revision 1.2  1994/10/06  17:05:25  john
  * First version of rle stuff.
- * 
+ *
  * Revision 1.1  1994/10/06  16:53:34  john
  * Initial revision
- * 
- * 
+ *
+ *
  */
 
 /*
@@ -122,7 +122,7 @@ static char rcsid[] = "$Id: rle.c 1.10 1995/08/14 14:26:34 allender Exp $";
 #include "gr.h"
 #include "grdef.h"
 #include "error.h"
-#include "key.h"
+//#include "key.h"
 
 #define RLE_CODE 			0xE0
 #define NOT_RLE_CODE		31
@@ -140,7 +140,7 @@ void gr_rle_decode( ubyte * src, ubyte * dest )
 			count = data & NOT_RLE_CODE;
 			if (count==0) return;
 			data = *src++;
-			for (i=0; i<count; i++ )	
+			for (i=0; i<count; i++ )
 				*dest++ = data;
 		}
 	}
@@ -180,7 +180,7 @@ void gr_rle_expand_scanline_masked( ubyte *dest, ubyte *src, int x1, int x2  )
 	count = i - x1;
 	i = x1;
 	// we know have '*count' pixels of 'color'.
-	
+
 	if ( x1+count > x2 )	{
 		count = x2-x1+1;
 		if ( color != TRANSPARENCY_COLOR )	rle_stosb( dest, count, color );
@@ -215,7 +215,7 @@ void gr_rle_expand_scanline_masked( ubyte *dest, ubyte *src, int x1, int x2  )
 			dest += count;
 		}
 
-	}	
+	}
 }
 
 void gr_rle_expand_scanline( ubyte *dest, ubyte *src, int x1, int x2  )
@@ -242,7 +242,7 @@ void gr_rle_expand_scanline( ubyte *dest, ubyte *src, int x1, int x2  )
 	count = i - x1;
 	i = x1;
 	// we know have '*count' pixels of 'color'.
-	
+
 	if ( x1+count > x2 )	{
 		count = x2-x1+1;
 		rle_stosb( dest, count, color );
@@ -275,7 +275,7 @@ void gr_rle_expand_scanline( ubyte *dest, ubyte *src, int x1, int x2  )
 			i += count;
 			dest += count;
 		}
-	}	
+	}
 }
 
 
@@ -291,7 +291,7 @@ int gr_rle_encode( int org_size, ubyte *src, ubyte *dest )
 	count = 1;
 
 	for (i=1; i<org_size; i++ )	{
-		c = *src++;							
+		c = *src++;
 		if ( c!=oc )	{
 			if ( count )	{
 				if ( (count==1) && ((oc & RLE_CODE)!=RLE_CODE) )	{
@@ -341,7 +341,7 @@ int gr_rle_getsize( int org_size, ubyte *src )
 	count = 1;
 
 	for (i=1; i<org_size; i++ )	{
-		c = *src++;							
+		c = *src++;
 		if ( c!=oc )	{
 			if ( count )	{
 				if ( (count==1) && ((oc & RLE_CODE)!=RLE_CODE) )	{
@@ -407,7 +407,7 @@ int gr_bitmap_rle_compress( grs_bitmap * bmp )
 typedef struct rle_cache_element {
 	grs_bitmap * rle_bitmap;
 	ubyte * rle_data;
-	grs_bitmap * expanded_bitmap;			
+	grs_bitmap * expanded_bitmap;
 	int last_used;
 } rle_cache_element;
 
@@ -438,7 +438,7 @@ void rle_cache_init()
 		rle_cache[i].expanded_bitmap = gr_create_bitmap( 64, 64 );
 		rle_cache[i].last_used = 0;
 		//Assert( rle_cache[i].expanded_bitmap != NULL );
-	}	
+	}
 	rle_cache_initialized = 1;
 //	atexit( rle_cache_close );
 }
@@ -449,7 +449,7 @@ void rle_cache_flush()
 	for (i=0; i<MAX_CACHE_BITMAPS; i++ )	{
 		rle_cache[i].rle_bitmap = NULL;
 		rle_cache[i].last_used = 0;
-	}	
+	}
 }
 
 void rle_expand_texture_sub( grs_bitmap * bmp, grs_bitmap * rle_temp_bitmap_1 )
@@ -496,7 +496,7 @@ void gr_rle_expand_scanline_generic( grs_bitmap * dest, int dx, int dy, ubyte *s
 	count = i - x1;
 	i = x1;
 	// we know have '*count' pixels of 'color'.
-	
+
 	if ( x1+count > x2 )	{
 		count = x2-x1+1;
 		for ( j=0; j<count; j++ )
@@ -529,7 +529,7 @@ void gr_rle_expand_scanline_generic( grs_bitmap * dest, int dx, int dy, ubyte *s
 				gr_bm_pixel( dest, dx++, dy, color );
 			i += count;
 		}
-	}	
+	}
 }
 
 grs_bitmap * rle_expand_texture( grs_bitmap * bmp )
@@ -570,7 +570,7 @@ grs_bitmap * rle_expand_texture( grs_bitmap * bmp )
 			lowest_count = rle_cache[i].last_used;
 			least_recently_used = i;
 		}
-	}	
+	}
 	rle_misses++;
 	rle_expand_texture_sub( bmp, rle_cache[least_recently_used].expanded_bitmap );
 	rle_cache[least_recently_used].rle_bitmap = bmp;

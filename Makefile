@@ -24,9 +24,9 @@ include $(DEVKITARM)/3ds_rules
 #---------------------------------------------------------------------------------
 TARGET      := $(notdir $(CURDIR))
 BUILD       := build
-SOURCES     := source
+SOURCES     := source/2d source/3d source/bios source/cfile source/fix source/iff source/main source/mem source/misc source/vecmat
 DATA        := data
-INCLUDES    := include
+INCLUDES    := source/2d source/3d source/bios source/cfile source/fix source/iff source/main source/mem source/misc source/vecmat source/includes
 ROMFS       := romfs
 OUTPUT      := output
 RESOURCES   := resources

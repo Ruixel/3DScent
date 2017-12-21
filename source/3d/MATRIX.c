@@ -7,7 +7,7 @@ IN USING, DISPLAYING,  AND CREATING DERIVATIVE WORKS THEREOF, SO LONG AS
 SUCH USE, DISPLAY OR CREATION IS FOR NON-COMMERCIAL, ROYALTY OR REVENUE
 FREE PURPOSES.  IN NO EVENT SHALL THE END-USER USE THE COMPUTER CODE
 CONTAINED HEREIN FOR REVENUE-BEARING PURPOSES.  THE END-USER UNDERSTANDS
-AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.  
+AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.
 COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
 */
 /*
@@ -15,17 +15,17 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
  * $Revision: 1.1 $
  * $Author: allender $
  * $Date: 1995/05/05 08:52:11 $
- * 
+ *
  * Matrix setup & manipulation routines
- * 
+ *
  * $Log: matrix.c $
  * Revision 1.1  1995/05/05  08:52:11  allender
  * Initial revision
  *
  * Revision 1.1  1995/04/17  04:14:34  matt
  * Initial revision
- * 
- * 
+ *
+ *
  */
 
 /*
@@ -38,7 +38,7 @@ static char rcsid[] = "$Id: matrix.c 1.1 1995/05/05 08:52:11 allender Exp $";
 
 void scale_matrix(void);
 /*
-//set view from x,y,z & p,b,h, zoom.  Must call one of g3_set_view_*() 
+//set view from x,y,z & p,b,h, zoom.  Must call one of g3_set_view_*()
 void g3_set_view_angles(vms_vector *view_pos,vms_angvec *view_orient,fix zoom)
 {
 	View_zoom = zoom;
@@ -50,7 +50,7 @@ void g3_set_view_angles(vms_vector *view_pos,vms_angvec *view_orient,fix zoom)
 
 }
 */
-//set view from x,y,z, viewer matrix, and zoom.  Must call one of g3_set_view_*() 
+//set view from x,y,z, viewer matrix, and zoom.  Must call one of g3_set_view_*()
 ITCM_CODE void g3_set_view_matrix(vms_vector *view_pos,vms_matrix *view_matrix,fix zoom)
 {
 	View_zoom = zoom;
@@ -87,15 +87,15 @@ void scale_matrix(void)
 	vm_vec_scale(&View_matrix.uvec,Matrix_scale.y);
 	vm_vec_scale(&View_matrix.fvec,Matrix_scale.z);
 
-	glPushMatrix ();
+/*	glPushMatrix ();
 	MATRIX_MULT3x3 = View_matrix.rvec.x >> 4;
 	MATRIX_MULT3x3 = View_matrix.uvec.x >> 4;
 	MATRIX_MULT3x3 = View_matrix.fvec.x >> 4;
-	
+
 	MATRIX_MULT3x3 = View_matrix.rvec.y >> 4;
 	MATRIX_MULT3x3 = View_matrix.uvec.y >> 4;
 	MATRIX_MULT3x3 = View_matrix.fvec.y >> 4;
-	
+
 	MATRIX_MULT3x3 = View_matrix.rvec.z >> 4;
 	MATRIX_MULT3x3 = View_matrix.uvec.z >> 4;
 	MATRIX_MULT3x3 = View_matrix.fvec.z >> 4;
@@ -104,5 +104,5 @@ void scale_matrix(void)
 	MATRIX_TRANSLATE = -View_position.y >> 12;
 	MATRIX_TRANSLATE = -View_position.z >> 12;
 	glPushMatrix ();
-	glPopMatrix (2);
+	glPopMatrix (2);*/
 }

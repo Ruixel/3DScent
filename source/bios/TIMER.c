@@ -1,8 +1,8 @@
-#include "ndsw.h"
+#include "3ds.h"
 
 #include "fix.h"
 
-vu64    TickCounter;
+/*vu64    TickCounter;
 
 ITCM_CODE void CountUpTick (void)
 {
@@ -28,4 +28,31 @@ void delay(int d_time)
 	t = timer_get_fixed_seconds();
 	total = (F1_0 * d_time) / 1000;
 	while (timer_get_fixed_seconds() - t < total) ;
+}
+*/
+
+TickCounter tickCounter;
+
+ITCM_CODE void CountUpTick(void)
+{
+    osTickCounterUpdate(&tickCounter);
+}
+
+ITCM_CODE fix timer_get_fixed_seconds ()
+{
+    return (fix) (osTickCounterRead(&tickCounter));
+}
+
+void timer_init ()
+{
+	osTickCounterStart(&tickCounter);
+}
+
+void delay(int d_time)
+{
+    fix t, total;
+
+    t = timer_get_fixed_seconds();
+    total = (F1_0 * d_time) / 1000;
+    while (timer_get_fixed_seconds() - t < total) ;
 }

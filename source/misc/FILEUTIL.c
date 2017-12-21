@@ -7,7 +7,7 @@ IN USING, DISPLAYING,  AND CREATING DERIVATIVE WORKS THEREOF, SO LONG AS
 SUCH USE, DISPLAY OR CREATION IS FOR NON-COMMERCIAL, ROYALTY OR REVENUE
 FREE PURPOSES.  IN NO EVENT SHALL THE END-USER USE THE COMPUTER CODE
 CONTAINED HEREIN FOR REVENUE-BEARING PURPOSES.  THE END-USER UNDERSTANDS
-AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.  
+AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.
 COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
 */
 /*
@@ -17,7 +17,7 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
  * $Date: 1995/10/30 11:09:51 $
  *
  * utilities for file manipulation
- * 
+ *
  * $Log: fileutil.c $
  * Revision 1.6  1995/10/30  11:09:51  allender
  * use FILE, not CFILE on the write* routines
@@ -37,7 +37,7 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
  * Initial revision
  *
 */
- 
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,7 +52,7 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
 int filelength(FILE *fp)
 {
 	int cur_pos, size;
-	
+
 	cur_pos = ftell (fp);
 	fseek(fp, 0, SEEK_END);
 	size = ftell (fp);
@@ -63,7 +63,7 @@ int filelength(FILE *fp)
 byte read_byte(CFILE *fp)
 {
 	byte b;
-	
+
 	cfread(&b, sizeof(byte), 1, fp);
 	return b;
 }
@@ -71,7 +71,7 @@ byte read_byte(CFILE *fp)
 short read_short(CFILE *fp)
 {
 	short s;
-	
+
 	cfread(&s, sizeof(short), 1, fp);
 	return (s);
 }
@@ -79,7 +79,7 @@ short read_short(CFILE *fp)
 int read_int(CFILE *fp)
 {
 	uint i;
-	
+
 	cfread(&i, sizeof(uint), 1, fp);
 	return i;
 }
@@ -87,7 +87,7 @@ int read_int(CFILE *fp)
 fix read_fix(CFILE *fp)
 {
 	fix f;
-	
+
 	cfread(&f, sizeof(fix), 1, fp);
 	return f;
 }
@@ -116,7 +116,7 @@ dir_t *dir_find (const char *ext)
 {
 	dir_t	*dir = malloc (sizeof (dir_t));
 
-	dir->dir = (struct DIR_ITER *)diropen (".");
+	dir->dir = (struct DIR_ITER *)opendir (".");
 	strncpy (dir->ext, ext, 3);
 	dir->ext[3] = 0;
 
@@ -129,20 +129,22 @@ const char *dir_findnext (dir_t *dir)
 	struct stat	filestat;
 	int		len;
 
-	while (!dirnext ((DIR_ITER *)dir->dir, filename, &filestat))
+	/*while (!dirnext ((DIR_ITER *)dir->dir, filename, &filestat))
 	{
 		if (!S_ISREG(filestat.st_mode))
 			continue;
 		len = strlen (filename);
 		if (!strnicmp (filename + (len - 3), dir->ext, 3))
 			return filename;
-	}
+	}*/
+
+
 
 	return NULL;
 }
 
 void dir_close (dir_t *dir)
 {
-	dirclose ((DIR_ITER *)dir->dir);
+	closedir ((DIR_ITER *)dir->dir);
 	free (dir);
 }

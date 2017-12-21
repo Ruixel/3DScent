@@ -7,7 +7,7 @@ IN USING, DISPLAYING,  AND CREATING DERIVATIVE WORKS THEREOF, SO LONG AS
 SUCH USE, DISPLAY OR CREATION IS FOR NON-COMMERCIAL, ROYALTY OR REVENUE
 FREE PURPOSES.  IN NO EVENT SHALL THE END-USER USE THE COMPUTER CODE
 CONTAINED HEREIN FOR REVENUE-BEARING PURPOSES.  THE END-USER UNDERSTANDS
-AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.  
+AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.
 COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
 */
 /*
@@ -15,9 +15,9 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
  * $Revision: 1.7 $
  * $Author: allender $
  * $Date: 1995/10/27 15:18:20 $
- * 
+ *
  * Functions for accessing compressed files.
- * 
+ *
  * $Log: cfile.c $
  * Revision 1.7  1995/10/27  15:18:20  allender
  * get back to descent directory before trying to read a hog file
@@ -44,81 +44,81 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
  * --- PC RCS Information ---
  * Revision 1.24  1995/03/15  14:20:27  john
  * Added critical error checker.
- * 
+ *
  * Revision 1.23  1995/03/13  15:16:53  john
  * Added alternate directory stuff.
- * 
+ *
  * Revision 1.22  1995/02/09  23:08:47  matt
  * Increased the max number of files in hogfile to 250
- * 
+ *
  * Revision 1.21  1995/02/01  20:56:47  john
  * Added cfexist function
- * 
+ *
  * Revision 1.20  1995/01/21  17:53:48  john
  * Added alternate pig file thing.
- * 
+ *
  * Revision 1.19  1994/12/29  15:10:02  john
  * Increased hogfile max files to 200.
- * 
+ *
  * Revision 1.18  1994/12/12  13:20:57  john
  * Made cfile work with fiellentth.
- * 
+ *
  * Revision 1.17  1994/12/12  13:14:25  john
  * Made cfiles prefer non-hog files.
- * 
+ *
  * Revision 1.16  1994/12/09  18:53:26  john
  * *** empty log message ***
- * 
+ *
  * Revision 1.15  1994/12/09  18:52:56  john
  * Took out mem, error checking.
- * 
+ *
  * Revision 1.14  1994/12/09  18:10:31  john
  * Speed up cfgets, which was slowing down the reading of
  * bitmaps.tbl, which was making POF loading look slow.
- * 
+ *
  * Revision 1.13  1994/12/09  17:53:51  john
  * Added error checking to number of hogfiles..
- * 
+ *
  * Revision 1.12  1994/12/08  19:02:55  john
  * Added cfgets.
- * 
+ *
  * Revision 1.11  1994/12/07  21:57:48  john
  * Took out data dir.
- * 
+ *
  * Revision 1.10  1994/12/07  21:38:02  john
  * Made cfile not return error..
- * 
+ *
  * Revision 1.9  1994/12/07  21:35:34  john
  * Made it read from data directory.
- * 
+ *
  * Revision 1.8  1994/12/07  21:33:55  john
  * Stripped out compression stuff...
- * 
+ *
  * Revision 1.7  1994/04/13  23:44:59  matt
  * When file cannot be opened, free up the buffer for that file.
- * 
+ *
  * Revision 1.6  1994/02/18  12:38:20  john
  * Optimized a bit
- * 
+ *
  * Revision 1.5  1994/02/15  18:13:20  john
  * Fixed more bugs.
- * 
+ *
  * Revision 1.4  1994/02/15  13:27:58  john
  * Works ok...
- * 
+ *
  * Revision 1.3  1994/02/15  12:51:57  john
  * Crappy inbetween version
- * 
+ *
  * Revision 1.2  1994/02/14  20:12:29  john
  * First version working with new cfile stuff.
- * 
+ *
  * Revision 1.1  1994/02/14  15:51:33  john
  * Initial revision
- * 
+ *
  * Revision 1.1  1994/02/10  15:45:12  john
  * Initial revision
- * 
- * 
+ *
+ *
  */
 
 /*
@@ -139,6 +139,7 @@ static char rcsid[] = "$Id: cfile.c 1.7 1995/10/27 15:18:20 allender Exp allende
 #include "error.h"
 #include "mem.h"
 #include "fileutil.h"
+#include "misc.h"
 
 typedef struct hogfile {
 	char	name[13];
@@ -176,7 +177,7 @@ FILE * cfile_get_filehandle( const char * filename, char * mode )
 {
 	FILE * fp;
 	char temp[128];
-	
+
 	descent_critical_error = 0;
 	fp = fopen( filename, mode );
 	if ( fp && descent_critical_error )	{
@@ -192,7 +193,7 @@ FILE * cfile_get_filehandle( const char * filename, char * mode )
 			fclose(fp);
 			fp = NULL;
 		}
-	} 
+	}
 	return fp;
 }
 
@@ -214,8 +215,8 @@ void cfile_init_hogfile(char *fname, hogfile * hog_files, int * nfiles )
 		return;
 	}
 
-	while( 1 )	
-	{	
+	while( 1 )
+	{
 		if ( *nfiles >= MAX_HOGFILES ) {
 			Warning( "ERROR: HOGFILE IS LIMITED TO %d FILES\n",  MAX_HOGFILES );
 			fclose(fp);
@@ -309,13 +310,13 @@ int cfexist( const char * filename )
 }
 
 
-CFILE * cfopen(const char * filename, char * mode ) 
+CFILE * cfopen(const char * filename, char * mode )
 {
 	int length;
 	FILE * fp;
 	CFILE *cfile;
 //	char new_filename[256], *p;
-		
+
 	if (stricmp( mode, "rb"))	{
 		Warning( "CFILES CAN ONLY BE OPENED WITH RB\n" );
 		exit(1);
@@ -359,7 +360,7 @@ int cfilelength( CFILE *fp )
 	return fp->size;
 }
 
-int cfgetc( CFILE * fp ) 
+int cfgetc( CFILE * fp )
 {
 	int c;
 
@@ -367,7 +368,7 @@ int cfgetc( CFILE * fp )
 
 	fseek (fp->file, fp->lib_offset + fp->raw_position, SEEK_SET);
 	c = getc( fp->file );
-	if (c!=EOF) 
+	if (c!=EOF)
 		fp->raw_position++;
 
 //	Assert( fp->raw_position==(ftell(fp->file)-fp->lib_offset) );
@@ -398,7 +399,7 @@ char * cfgets( char * buf, size_t n, CFILE * fp )
 	return  t;
 }
 
-size_t cfread( void * buf, size_t elsize, size_t nelem, CFILE * fp ) 
+size_t cfread( void * buf, size_t elsize, size_t nelem, CFILE * fp )
 {
 	int i;
 	if ((fp->raw_position+(elsize*nelem)) > (size_t)fp->size ) return EOF;
@@ -408,7 +409,7 @@ size_t cfread( void * buf, size_t elsize, size_t nelem, CFILE * fp )
 	return i;
 }
 
-int cftell( CFILE *fp )	
+int cftell( CFILE *fp )
 {
 	return fp->raw_position;
 }
@@ -429,14 +430,14 @@ int cfseek( CFILE *fp, long int offset, int where )
 		break;
 	default:
 		return 1;
-	}	
+	}
 	c = fseek( fp->file, fp->lib_offset + goal_position, SEEK_SET );
 	fp->raw_position = ftell(fp->file)-fp->lib_offset;
 	return c;
 }
 
-void cfclose( CFILE * fp ) 
-{	
+void cfclose( CFILE * fp )
+{
 	fclose(fp->file);
 	free(fp);
 	return;
