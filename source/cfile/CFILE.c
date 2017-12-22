@@ -312,13 +312,14 @@ FILE * cfile_find_libfile(const char * name, int * length)
 
     printf("Files: %d\n", Num_hogfiles);
 
-    for (i=0; i<20; i++ )	{
-        printf("File %d: %s\n", i, HogFiles[i].name);
+    for (i=50; i<70; i++ )	{
+        //printf("File %d: %s\n", i, HogFiles[i].name);
+        //printf("Offset: %d\n", HogFiles[i].offset);
     }
 
     // Search in each hog file for the file we want
-	for (i=0; i<Num_hogfiles; i++ )	{
-		if ( !stricmp( HogFiles[i].name, name ))	{
+	for (i=0; i<10; i++ )	{
+		/*if ( stricmp( HogFiles[i].name, name ))	{
             printf("File: %s\n", HogFiles[i].name);
 
 			fp = cfile_get_filehandle( "DESCENT.HOG", "rb" );
@@ -330,8 +331,12 @@ FILE * cfile_find_libfile(const char * name, int * length)
 			*length = HogFiles[i].length;
 
 			return fp;
-		}
+		} else {*/
+            Warning("%s does not match %s", name, HogFiles[i].name);
+            Warning("By %d", stricmp( HogFiles[i].name, name ));
+		//}
 	}
+	Warning("%n could not be found", name);
 	return NULL;
 }
 

@@ -40,7 +40,7 @@ int max( int a, int b )
 
 void string_tolower(char s1[])
 {
-    for (int i = 0; s1[i]; i++)
+    for (int i = 0; s1[i]!=0; i++)
     {
         s1[i] = tolower(s1[i]);
     }
@@ -48,14 +48,14 @@ void string_tolower(char s1[])
 
 int strnicmp(char *s1, char *s2, int n)
 {
-    string_tolower(*s1);
-    string_tolower(*s1);
-    return strncmp(*s1, *s2, n);
+    string_tolower(s1);
+    string_tolower(s2);
+    return strncmp(s1, s2, n);
 }
 
 int stricmp(char *s1, char *s2)
 {
-    string_tolower(*s1);
-    string_tolower(*s1);
-    return strcmp(*s1, *s2);
+    string_tolower(s1);
+    string_tolower(s2);
+    return strcmp(s1, s2);
 }
