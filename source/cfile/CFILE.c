@@ -312,9 +312,13 @@ FILE * cfile_find_libfile(const char * name, int * length)
 
     printf("Files: %d\n", Num_hogfiles);
 
+    for (i=0; i<20; i++ )	{
+        printf("File %d: %s\n", i, HogFiles[i].name);
+    }
+
     // Search in each hog file for the file we want
 	for (i=0; i<Num_hogfiles; i++ )	{
-		if ( !stricmp( HogFiles[i].name, "d" ))	{
+		if ( !stricmp( HogFiles[i].name, name ))	{
             printf("File: %s\n", HogFiles[i].name);
 
 			fp = cfile_get_filehandle( "DESCENT.HOG", "rb" );

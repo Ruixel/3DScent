@@ -207,7 +207,8 @@ void gr_use_palette_table( char * filename )
 
 	fsize	= cfilelength( fp );
 	printf("Palette table size: %d\n", fsize);
-	Assert( fsize == 9472 );
+	if ( fsize != 9472 )
+        Error("Palette size incorrect, need to be 9472");
 	cfread( gr_palette, 256*3, 1, fp );
 	cfread( gr_fade_table, 256*34, 1, fp );
 	cfclose(fp);

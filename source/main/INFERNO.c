@@ -1362,8 +1362,6 @@ int main(int argc,char **argv)
 		if (Inferno_verbose) printf( "\n%s",TXT_SOUND_DISABLED );
 	}
 
-	Error("Stop 2");
-
 #ifdef NETWORK
 	if (!FindArg( "-nonetwork" ))	{
 /*		int socket=0, showaddress=0;
@@ -1415,10 +1413,12 @@ int main(int argc,char **argv)
 	mprintf( (0, "Going into graphics mode..." ));
 	gr_set_mode(SM_320x200C);
 	mprintf( (0, "\nInitializing palette system..." ));
-	gr_use_palette_table( "PALETTE.256" );
+	gr_use_palette_table( "LEVEjL1.TXB" );
+	//gr_use_palette_table( "PALETTE.256" );
 	mprintf( (0, "\nInitializing font system..." ));
 	gamefont_init();	// must load after palette data loaded.
 	songs_play_song( SONG_TITLE, 1 );
+
 
 /*
 	i = FindArg( "-vfxtrak" );
