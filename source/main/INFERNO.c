@@ -1130,11 +1130,13 @@ int main(int argc,char **argv)
     gfxInitDefault();
     consoleInit(GFX_TOP, NULL);
 
+    printf("Launching 3DScent...\n");
 
 	InitArgs( argc,argv );
 
 	if ( FindArg( "-verbose" ) )
 		Inferno_verbose = 1;
+
 
 	//change_to_dir(argv[0]);
 /*

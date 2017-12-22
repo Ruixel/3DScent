@@ -143,7 +143,7 @@ static char rcsid[] = "$Id: cfile.c 1.7 1995/10/27 15:18:20 allender Exp allende
 
 typedef struct hogfile {
 	char	name[13];
-	int	offset;
+	int	    offset;
 	int 	length;
 } hogfile;
 
@@ -175,15 +175,22 @@ extern int descent_critical_error;
 
 FILE * cfile_get_filehandle( const char * filename, char * mode )
 {
+    // Create variables
 	FILE * fp;
 	char temp[128];
 
+	// Open file
 	descent_critical_error = 0;
 	fp = fopen( filename, mode );
 	if ( fp && descent_critical_error )	{
+        // If there has been a critical error, abort opening
 		fclose(fp);
 		fp = NULL;
 	}
+
+	printf("Hog Dir: %s\n", AltHogDir);
+
+	// If file was not found but the HOG file was initialized
 	if ( (fp==NULL) && (AltHogdir_initialized) )	{
 		strcpy( temp, AltHogDir );
 		strcat( temp, filename );
@@ -197,18 +204,48 @@ FILE * cfile_get_filehandle( const char * filename, char * mode )
 	return fp;
 }
 
+char* findFile(const char* ds_fname)
+{
+    // Length of filename
+    size_t pl = strlen(ds_fname) + 4;
+
+    // From Prdoom, check 8 directories for the file we want
+    /*for (int i = 0; i < 8; i++) {
+        char *p;
+        const char *directory = NULL;
+        const char *s = NULL;
+
+        switch(i)
+    }*/
+
+    //char* p = "ew";
+    return NULL;
+}
+
 void cfile_init_hogfile(char *fname, hogfile * hog_files, int * nfiles )
 {
+    // Create variables
 	char id[4];
 	FILE * fp;
 	int i, len;
 
 	*nfiles = 0;
 
-	fp = cfile_get_filehandle( fname, "rb" );
-	if ( fp == NULL ) return;
+	//char romfs_fname[64] = "romfs:/";
+	//strcat(romfs_fname, fname);
 
-	fseek (fp, 0, SEEK_CUR);
+	fp = cfile_get_filehandle( fname, "rb" );
+	if ( fp == NULL ) {
+	    // Find the current working directory of the 3DS
+	    char cwd[256];
+	    if (getcwd(cwd, sizeof(cwd)) != NULL )
+            printf("CWD: %s\n", cwd);
+
+        Hogfile_initialized = 1;
+        return;
+	}
+
+	fseek ( fp, 0, SEEK_CUR);
 	fread( id, 3, 1, fp );
 	if ( strncmp( id, "DHF", 3 ) )	{
 		fclose(fp);
@@ -249,11 +286,17 @@ FILE * cfile_find_libfile(const char * name, int * length)
 	FILE * fp;
 	int i;
 
+	// Alternate HOG File
 	if ( AltHogfile_initialized )	{
+        Warning("ddsds");
 		for (i=0; i<AltNum_hogfiles; i++ )	{
+            Warning("ddsds2");
 			if ( !stricmp( AltHogFiles[i].name, name ))	{
+                Warning("ddsds3");
 				fp = cfile_get_filehandle( AltHogFilename, "rb" );
-				if ( fp == NULL ) return NULL;
+
+				if ( fp == NULL )
+                    return NULL;
 				fseek( fp,  AltHogFiles[i].offset, SEEK_SET );
 				*length = AltHogFiles[i].length;
 				return fp;
@@ -261,17 +304,27 @@ FILE * cfile_find_libfile(const char * name, int * length)
 		}
 	}
 
+	// If the HOG file is not initialized then initialize it
 	if ( !Hogfile_initialized ) 	{
-		cfile_init_hogfile( "descent.hog", HogFiles, &Num_hogfiles );
+		cfile_init_hogfile( "DESCENT.HOG", HogFiles, &Num_hogfiles );
 		Hogfile_initialized = 1;
 	}
 
+    printf("Files: %d\n", Num_hogfiles);
+
+    // Search in each hog file for the file we want
 	for (i=0; i<Num_hogfiles; i++ )	{
-		if ( !stricmp( HogFiles[i].name, name ))	{
-			fp = cfile_get_filehandle( "descent.hog", "rb" );
-			if ( fp == NULL ) return NULL;
+		if ( !stricmp( HogFiles[i].name, "d" ))	{
+            printf("File: %s\n", HogFiles[i].name);
+
+			fp = cfile_get_filehandle( "DESCENT.HOG", "rb" );
+
+			if ( fp == NULL )
+                return NULL;
+
 			fseek( fp,  HogFiles[i].offset, SEEK_SET );
 			*length = HogFiles[i].length;
+
 			return fp;
 		}
 	}
@@ -309,14 +362,18 @@ int cfexist( const char * filename )
 	return 0;		// Couldn't find it.
 }
 
-
+// Open a specific file
+// Return a pointer to said file
 CFILE * cfopen(const char * filename, char * mode )
 {
+    // Create some variables to be used
 	int length;
 	FILE * fp;
 	CFILE *cfile;
 //	char new_filename[256], *p;
 
+    // Make sure that the given mode is RB
+    // RB means read-only for non-text files
 	if (stricmp( mode, "rb"))	{
 		Warning( "CFILES CAN ONLY BE OPENED WITH RB\n" );
 		exit(1);
@@ -326,27 +383,45 @@ CFILE * cfopen(const char * filename, char * mode )
 	while ( (p = strchr(new_filename, 13) ) )	*p = '\0';
 	while ( (p = strchr(new_filename, 10) ) )	*p = '\0';
 */
-	fp = cfile_get_filehandle( filename, mode );		// Check for non-hog file first...
+    // Check for non-hog file first.
+	fp = cfile_get_filehandle( filename, mode );
 	if ( !fp ) {
+        // If there's none found, then use the hog file to find it
 		fp = cfile_find_libfile(filename, &length );
-		if ( !fp )
+		if ( !fp ) {
+            Warning("File %s not found in HOG", filename);
 			return NULL;		// No file found
+		}
+
+        // Check the file isn't empty
 		cfile = (CFILE *)malloc ( sizeof(CFILE) );
 		if ( cfile == NULL ) {
+            Warning("File %s empty", filename);
 			fclose(fp);
 			return NULL;
 		}
+
+		printf("Found HOGFile: %s\n", filename);
+
+		// Initialize the data for the cfile
 		cfile->file = fp;
 		cfile->size = length;
+		// Offset in the .hog file
 		cfile->lib_offset = ftell( fp );
 		cfile->raw_position = 0;
 		return cfile;
 	} else {
+	    // Check the file isn't empty
 		cfile = (CFILE *)malloc ( sizeof(CFILE) );
 		if ( cfile == NULL ) {
+            Warning("File %s in HOG is empty", filename);
 			fclose(fp);
 			return NULL;
 		}
+
+		printf("Found file: %s\n", filename);
+
+		// Initialize the data for the cfile
 		cfile->file = fp;
 		cfile->size = filelength( fp );
 		cfile->lib_offset = 0;
@@ -355,6 +430,7 @@ CFILE * cfopen(const char * filename, char * mode )
 	}
 }
 
+// Getter for the length of a file
 int cfilelength( CFILE *fp )
 {
 	return fp->size;
