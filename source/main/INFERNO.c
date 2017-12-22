@@ -1134,7 +1134,7 @@ int main(int argc,char **argv)
 
 	InitArgs( argc,argv );
 
-	if ( FindArg( "-verbose" ) )
+	//if ( FindArg( "-verbose" ) )
 		Inferno_verbose = 1;
 
 
@@ -1190,6 +1190,7 @@ int main(int argc,char **argv)
 
 	printf("\nDESCENT   %s\n", VERSION_NAME);
 	printf("%s\n%s\n",TXT_COPYRIGHT,TXT_TRADEMARK);
+
 #if 0
 	check_id_checksum_and_date();
 
@@ -1360,6 +1361,8 @@ int main(int argc,char **argv)
 	} else {
 		if (Inferno_verbose) printf( "\n%s",TXT_SOUND_DISABLED );
 	}
+
+	Error("Stop 2");
 
 #ifdef NETWORK
 	if (!FindArg( "-nonetwork" ))	{
@@ -1650,11 +1653,11 @@ int main(int argc,char **argv)
 	if ( FindArg( "-norun" ) )
 		return(0);
 
-	mprintf( (0, "\nInitializing 3d system..." ));
+	printf( (0, "\nInitializing 3d system..." ));
 	g3_init();
-	mprintf( (0, "\nInitializing texture caching system..." ));
+	printf( (0, "\nInitializing texture caching system..." ));
 	texmerge_init( 10 );		// 10 cache bitmaps
-	mprintf( (0, "\nRunning game...\n" ));
+	printf( (0, "\nRunning game...\n" ));
 	set_screen_mode(SCREEN_MENU);
 
 	init_game();

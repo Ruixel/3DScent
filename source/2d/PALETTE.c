@@ -206,6 +206,7 @@ void gr_use_palette_table( char * filename )
 		Error("Can't open palette file <%s>",filename);
 
 	fsize	= cfilelength( fp );
+	printf("Palette table size: %d\n", fsize);
 	Assert( fsize == 9472 );
 	cfread( gr_palette, 256*3, 1, fp );
 	cfread( gr_fade_table, 256*34, 1, fp );

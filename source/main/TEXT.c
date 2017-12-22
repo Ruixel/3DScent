@@ -110,13 +110,13 @@ void load_text()
 	CFILE *ifile;
 	int len,i, have_binary = 0;
 	char *tptr;
-	char *filename="descent.tex";
+	char *filename="DESCENT.TEX";
 
 	if ((i=FindArg("-text"))!=0)
 		filename = Args[i+1];
 
 	if ((tfile = cfopen(filename,"rb")) == NULL) {
-		filename="descent.txb";
+		filename="DESCENT.TXB";
 		if ((ifile = cfopen(filename, "rb")) == NULL)
 			Error("Cannot open file DESCENT.TEX or DESCENT.TXB");
 
@@ -137,6 +137,7 @@ void load_text()
 		char * p;
 
 		len = cfilelength(tfile);
+		printf("Length of tex is %d\n", len);
 
 		text = malloc (len);
 
@@ -146,7 +147,7 @@ void load_text()
 		p = text;
 		do {
 			c = cfgetc( tfile );
-            printf("xd %d\n", c);
+            //printf("xd %d\n", c);
 
 			if ( c != 13 )
 				*p++ = c;
@@ -154,6 +155,7 @@ void load_text()
 
 		cfclose(tfile);
 	}
+
 	for (i=0,tptr=text;i<N_TEXT_STRINGS;i++) {
 		char *p;
 
@@ -161,18 +163,19 @@ void load_text()
 
 		tptr = strchr(tptr,0x0a);
 
+		printf("hey %d\n", i);
 		if (!tptr)
 			Error("Not enough strings in text file - expecting %d, found %d\nYou most likely do not have the proper version of the data files\nYou need atleast v1.4a REGISTERED\n",N_TEXT_STRINGS,i);
 
 		if ( tptr ) *tptr++ = 0;
 
-		if (have_binary) {
+		//if (have_binary) {
 			for (p=Text_string[i]; p < tptr - 1; p++) {
 				encode_rotate_left(p);
 				*p = *p ^ BITMAP_TBL_XOR;
 				encode_rotate_left(p);
 			}
-		}
+		//}
 
 		//scan for special chars (like \n)
 		for (p=Text_string[i];(p=strchr(p,'\\'));) {
