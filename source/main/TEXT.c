@@ -169,13 +169,13 @@ void load_text()
 
 		if ( tptr ) *tptr++ = 0;
 
-		//if (have_binary) {
+		if (have_binary) {
 			for (p=Text_string[i]; p < tptr - 1; p++) {
 				encode_rotate_left(p);
 				*p = *p ^ BITMAP_TBL_XOR;
 				encode_rotate_left(p);
 			}
-		//}
+		}
 
 		//scan for special chars (like \n)
 		for (p=Text_string[i];(p=strchr(p,'\\'));) {

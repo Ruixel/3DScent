@@ -1413,7 +1413,7 @@ int main(int argc,char **argv)
 	mprintf( (0, "Going into graphics mode..." ));
 	gr_set_mode(SM_320x200C);
 	mprintf( (0, "\nInitializing palette system..." ));
-	gr_use_palette_table( "LEVEjL1.TXB" );
+	gr_use_palette_table( "PALETTE.256" );
 	//gr_use_palette_table( "PALETTE.256" );
 	mprintf( (0, "\nInitializing font system..." ));
 	gamefont_init();	// must load after palette data loaded.
@@ -1659,6 +1659,7 @@ int main(int argc,char **argv)
 	texmerge_init( 10 );		// 10 cache bitmaps
 	printf( (0, "\nRunning game...\n" ));
 	set_screen_mode(SCREEN_MENU);
+	Error("hey");
 
 	init_game();
 	set_detail_level_parameters(Detail_level);

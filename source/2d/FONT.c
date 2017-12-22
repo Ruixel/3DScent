@@ -728,14 +728,14 @@ grs_font * gr_init_font( char * fontname )
 		colormap[TRANSPARENCY_COLOR] = TRANSPARENCY_COLOR;
 
 		decode_data_asm(font->ft_data, ptr-font->ft_data, colormap, freq );
-/*
-		for (i = 0; i < ptr-font->ft_data; i++) {
+
+		/*for (i = 0; i < ptr-font->ft_data; i++) {
 			if (font->ft_data[i] == 0)
 				font->ft_data[i] = 255;
 			else if (font->ft_data[i] == 255)
 				font->ft_data[i] = 0;
-		}
-*/
+		}*/
+
 	}
 
 	cfclose(fontfile);

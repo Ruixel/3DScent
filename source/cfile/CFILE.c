@@ -188,8 +188,6 @@ FILE * cfile_get_filehandle( const char * filename, char * mode )
 		fp = NULL;
 	}
 
-	printf("Hog Dir: %s\n", AltHogDir);
-
 	// If file was not found but the HOG file was initialized
 	if ( (fp==NULL) && (AltHogdir_initialized) )	{
 		strcpy( temp, AltHogDir );
@@ -310,18 +308,12 @@ FILE * cfile_find_libfile(const char * name, int * length)
 		Hogfile_initialized = 1;
 	}
 
-    printf("Files: %d\n", Num_hogfiles);
-
-    for (i=50; i<70; i++ )	{
-        //printf("File %d: %s\n", i, HogFiles[i].name);
-        //printf("Offset: %d\n", HogFiles[i].offset);
-    }
+	Warning("%s corrupted name", HogFiles[51].name);
 
     // Search in each hog file for the file we want
-	for (i=0; i<10; i++ )	{
-		/*if ( stricmp( HogFiles[i].name, name ))	{
-            printf("File: %s\n", HogFiles[i].name);
-
+	for (i=0; i<Num_hogfiles; i++ )	{
+		if ( !stricmp( HogFiles[i].name, name ))	{
+            printf("Found in position %d\n", i);
 			fp = cfile_get_filehandle( "DESCENT.HOG", "rb" );
 
 			if ( fp == NULL )
@@ -331,12 +323,12 @@ FILE * cfile_find_libfile(const char * name, int * length)
 			*length = HogFiles[i].length;
 
 			return fp;
-		} else {*/
-            Warning("%s does not match %s", name, HogFiles[i].name);
-            Warning("By %d", stricmp( HogFiles[i].name, name ));
-		//}
+		} else {
+            //printf("%s does not match %s\n", HogFiles[i].name, name);
+            //printf("By %d\n", stricmp( HogFiles[i].name, name ));
+		}
 	}
-	Warning("%n could not be found", name);
+	Warning("%s could not be found", name);
 	return NULL;
 }
 

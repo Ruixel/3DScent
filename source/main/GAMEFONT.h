@@ -7,7 +7,7 @@ IN USING, DISPLAYING,  AND CREATING DERIVATIVE WORKS THEREOF, SO LONG AS
 SUCH USE, DISPLAY OR CREATION IS FOR NON-COMMERCIAL, ROYALTY OR REVENUE
 FREE PURPOSES.  IN NO EVENT SHALL THE END-USER USE THE COMPUTER CODE
 CONTAINED HEREIN FOR REVENUE-BEARING PURPOSES.  THE END-USER UNDERSTANDS
-AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.  
+AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.
 COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
 */
 /*
@@ -15,37 +15,37 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
  * $Revision: 2.0 $
  * $Author: john $
  * $Date: 1995/02/27 11:31:09 $
- * 
+ *
  * Font declarations for the game,.
- * 
+ *
  * $Log: gamefont.h $
  * Revision 2.0  1995/02/27  11:31:09  john
  * New version 2.0, which has no anonymous unions, builds with
  * Watcom 10.0, and doesn't require parsing BITMAPS.TBL.
- * 
+ *
  * Revision 1.7  1994/11/18  16:41:28  adam
  * trimmed meat
- * 
+ *
  * Revision 1.6  1994/11/17  13:07:00  adam
  * removed unused font
- * 
+ *
  * Revision 1.5  1994/11/03  21:36:02  john
  * Added code for credit fonts.
- * 
+ *
  * Revision 1.4  1994/08/17  20:20:25  matt
  * Took out alternate-color versions of font3, since this is a mono font
- * 
+ *
  * Revision 1.3  1994/08/11  12:44:32  adam
  * killed a #define
- * 
+ *
  * Revision 1.2  1994/08/10  19:57:16  john
  * Changed font stuff; Took out old menu; messed up lots of
  * other stuff like game sequencing messages, etc.
- * 
+ *
  * Revision 1.1  1994/08/10  17:20:22  john
  * Initial revision
- * 
- * 
+ *
+ *
  */
 
 
@@ -67,7 +67,7 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
 #define MENU_FONT		(Gamefonts[GFONT_MEDIUM_1])
 #define SCORES_FONT	(Gamefonts[GFONT_MEDIUM_1])
 
-#define MAX_FONTS 5
+#define MAX_FONTS 4
 
 extern grs_font *Gamefonts[MAX_FONTS];
 
