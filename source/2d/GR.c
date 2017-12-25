@@ -294,8 +294,8 @@ int gr_set_mode(int mode)
 	}
 	*/
 
-	w = 256;
-	h = 192 * 2;
+	w = 400;
+	h = 256;
 	gr_palette_clear();
 	grd_curscreen->sc_w = w;
 	grd_curscreen->sc_h = h;
@@ -306,7 +306,7 @@ int gr_set_mode(int mode)
 	grd_curscreen->sc_canvas.cv_bitmap.bm_type = BM_LINEAR;
 	grd_curscreen->sc_canvas.cv_bitmap.bm_w = w;
 	grd_curscreen->sc_canvas.cv_bitmap.bm_h = h;
-	grd_curscreen->sc_canvas.cv_bitmap.bm_rowsize = 256;
+	grd_curscreen->sc_canvas.cv_bitmap.bm_rowsize = 400;
 	grd_curscreen->sc_canvas.cv_bitmap.bm_data = back_buffer;
 	gr_set_current_canvas(NULL);
 

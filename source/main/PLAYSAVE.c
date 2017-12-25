@@ -7,7 +7,7 @@ IN USING, DISPLAYING,  AND CREATING DERIVATIVE WORKS THEREOF, SO LONG AS
 SUCH USE, DISPLAY OR CREATION IS FOR NON-COMMERCIAL, ROYALTY OR REVENUE
 FREE PURPOSES.  IN NO EVENT SHALL THE END-USER USE THE COMPUTER CODE
 CONTAINED HEREIN FOR REVENUE-BEARING PURPOSES.  THE END-USER UNDERSTANDS
-AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.  
+AND AGREES TO THE TERMS HEREIN AND ACCEPTS THE SAME BY USE OF THIS FILE.
 COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
 */
 /*
@@ -15,9 +15,9 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
  * $Revision: 1.1 $
  * $Author: allender $
  * $Date: 1995/12/05 16:05:47 $
- * 
+ *
  * Functions to load & save player games
- * 
+ *
  * $Log: playsave.c $
  * Revision 1.1  1995/12/05  16:05:47  allender
  * Initial revision
@@ -55,197 +55,197 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
  * Revision 2.2  1995/03/24  17:48:21  john
  * Made player files from saturn excrement the highest level for
  * normal descent levels.
- * 
+ *
  * Revision 2.1  1995/03/21  14:38:49  john
  * Ifdef'd out the NETWORK code.
- * 
+ *
  * Revision 2.0  1995/02/27  11:27:59  john
  * New version 2.0, which has no anonymous unions, builds with
  * Watcom 10.0, and doesn't require parsing BITMAPS.TBL.
- * 
+ *
  * Revision 1.57  1995/02/13  20:34:55  john
  * Lintized
- * 
+ *
  * Revision 1.56  1995/02/13  13:23:24  john
  * Fixed bug with new player joystick selection.
- * 
+ *
  * Revision 1.55  1995/02/13  12:01:19  john
- * Fixed bug with joystick throttle still asking for 
+ * Fixed bug with joystick throttle still asking for
  * calibration with new pilots.
- * 
+ *
  * Revision 1.54  1995/02/13  10:29:12  john
  * Fixed bug with creating new player not resetting everything to default.
- * 
+ *
  * Revision 1.53  1995/02/03  10:58:46  john
  * Added code to save shareware style saved games into new format...
  * Also, made new player file format not have the saved game array in it.
- * 
+ *
  * Revision 1.52  1995/02/02  21:09:28  matt
  * Let player start of level 8 if he made it to level 7 in the shareware
- * 
+ *
  * Revision 1.51  1995/02/02  18:50:14  john
  * Added warning for FCS when new pilot chooses.
- * 
+ *
  * Revision 1.50  1995/02/02  11:21:34  john
  * Made joystick calibrate when new user selects.
- * 
+ *
  * Revision 1.49  1995/02/01  18:06:38  rob
  * Put defaults macros into descent.tex
- * 
+ *
  * Revision 1.48  1995/01/25  14:37:53  john
  * Made joystick only prompt for calibration once...
- * 
+ *
  * Revision 1.47  1995/01/24  19:37:12  matt
  * Took out incorrect mprintf
- * 
+ *
  * Revision 1.46  1995/01/22  18:57:22  matt
  * Made player highest level work with missions
- * 
+ *
  * Revision 1.45  1995/01/21  16:36:05  matt
  * Made starting level system work for now, pending integration with
  * mission code.
- * 
+ *
  * Revision 1.44  1995/01/20  22:47:32  matt
  * Mission system implemented, though imcompletely
- * 
+ *
  * Revision 1.43  1995/01/04  14:58:39  rob
  * Fixed for shareware build.
- * 
+ *
  * Revision 1.42  1995/01/04  11:36:43  rob
  * Added compatibility with older shareware pilot files.
- * 
+ *
  * Revision 1.41  1995/01/03  11:01:58  rob
  * fixed a default macro.
- * 
+ *
  * Revision 1.40  1995/01/03  10:44:06  rob
  * Added default taunt macros.
- * 
+ *
  * Revision 1.39  1994/12/13  10:01:16  allender
  * pop up message box when unable to correctly save player file
- * 
+ *
  * Revision 1.38  1994/12/12  11:37:14  matt
  * Fixed auto leveling defaults & saving
- * 
+ *
  * Revision 1.37  1994/12/12  00:26:59  matt
  * Added support for no-levelling option
- * 
+ *
  * Revision 1.36  1994/12/10  19:09:54  matt
  * Added assert for valid player number when loading game
- * 
+ *
  * Revision 1.35  1994/12/08  10:53:07  rob
  * Fixed a bug in highest_level tracking.
- * 
+ *
  * Revision 1.34  1994/12/08  10:01:36  john
  * Changed the way the player callsign stuff works.
- * 
+ *
  * Revision 1.33  1994/12/07  18:30:38  rob
  * Load highest level along with player (used to be only if higher)
  * Capped at LAST_LEVEL in case a person loads a registered player in shareware.
- * 
+ *
  * Revision 1.32  1994/12/03  16:01:12  matt
  * When player file has bad version, force player to choose another
- * 
+ *
  * Revision 1.31  1994/12/02  19:54:00  yuan
  * Localization.
- * 
+ *
  * Revision 1.30  1994/12/02  11:01:36  yuan
  * Localization.
- * 
+ *
  * Revision 1.29  1994/11/29  03:46:28  john
  * Added joystick sensitivity; Added sound channels to detail menu.  Removed -maxchannels
  * command line arg.
- * 
+ *
  * Revision 1.28  1994/11/29  01:10:23  john
  * Took out code that allowed new players to
  * configure keyboard.
- * 
+ *
  * Revision 1.27  1994/11/25  22:47:10  matt
  * Made saved game descriptions longer
- * 
+ *
  * Revision 1.26  1994/11/22  12:10:42  rob
  * Fixed file handle left open if player file versions don't
  * match.
- * 
+ *
  * Revision 1.25  1994/11/21  19:35:30  john
  * Replaced calls to joy_init with if (joy_present)
- * 
+ *
  * Revision 1.24  1994/11/21  17:29:34  matt
  * Cleaned up sequencing & game saving for secret levels
- * 
+ *
  * Revision 1.23  1994/11/21  11:10:01  john
- * Fixed bug with read-only .plr file making the config file 
+ * Fixed bug with read-only .plr file making the config file
  * not update.
- * 
+ *
  * Revision 1.22  1994/11/20  19:03:08  john
- * Fixed bug with if not having a joystick, default 
+ * Fixed bug with if not having a joystick, default
  * player input device is cyberman.
- * 
+ *
  * Revision 1.21  1994/11/17  12:24:07  matt
  * Made an array the right size, to fix error loading games
- * 
+ *
  * Revision 1.20  1994/11/14  17:52:54  allender
  * add call to WriteConfigFile when player files gets written
- * 
+ *
  * Revision 1.19  1994/11/14  17:19:23  rob
  * Removed gamma, joystick calibration, and sound settings from player file.
  * Added default difficulty and multi macros.
- * 
+ *
  * Revision 1.18  1994/11/07  14:01:23  john
  * Changed the gamma correction sequencing.
- * 
+ *
  * Revision 1.17  1994/11/05  17:22:49  john
  * Fixed lots of sequencing problems with newdemo stuff.
- * 
+ *
  * Revision 1.16  1994/11/01  16:40:11  john
  * Added Gamma correction.
- * 
+ *
  * Revision 1.15  1994/10/24  19:56:50  john
  * Made the new user setup prompt for config options.
- * 
+ *
  * Revision 1.14  1994/10/24  17:44:21  john
  * Added stereo channel reversing.
- * 
+ *
  * Revision 1.13  1994/10/24  16:05:12  matt
  * Improved handling of player names that are the names of DOS devices
- * 
+ *
  * Revision 1.12  1994/10/22  00:08:51  matt
  * Fixed up problems with bonus & game sequencing
  * Player doesn't get credit for hostages unless he gets them out alive
- * 
+ *
  * Revision 1.11  1994/10/19  19:59:57  john
  * Added bonus points at the end of level based on skill level.
- * 
+ *
  * Revision 1.10  1994/10/19  15:14:34  john
  * Took % hits out of player structure, made %kills work properly.
- * 
+ *
  * Revision 1.9  1994/10/19  12:44:26  john
  * Added hours field to player structure.
- * 
+ *
  * Revision 1.8  1994/10/17  17:24:34  john
  * Added starting_level to player struct.
- * 
+ *
  * Revision 1.7  1994/10/17  13:07:15  john
  * Moved the descent.cfg info into the player config file.
- * 
+ *
  * Revision 1.6  1994/10/09  14:54:31  matt
  * Made player cockpit state & window size save/restore with saved games & automap
- * 
+ *
  * Revision 1.5  1994/10/08  23:08:09  matt
  * Added error check & handling for game load/save disk io
- * 
+ *
  * Revision 1.4  1994/10/05  17:40:54  rob
  * Bumped save_file_version to 5 due to change in player.h
- * 
+ *
  * Revision 1.3  1994/10/03  23:00:54  matt
  * New file version for shorter callsigns
- * 
+ *
  * Revision 1.2  1994/09/28  17:25:05  matt
  * Added first draft of game save/load system
- * 
+ *
  * Revision 1.1  1994/09/27  14:39:12  matt
  * Initial revision
- * 
- * 
+ *
+ *
  */
 /*
 #pragma off (unreferenced)
@@ -277,7 +277,7 @@ static char rcsid[] = "$Id: playsave.c 1.1 1995/12/05 16:05:47 allender Exp alle
 //#define SAVE_FILE_ID			'DPLR'
 #define SAVE_FILE_ID			(('D' << 24) | ('P' << 16) | ('L' << 8) | ('R' << 0))
 
-//this is for version 6 and above 
+//this is for version 6 and above
 typedef struct save_info {
 	int	id;
 	short	saved_game_version,player_struct_version;
@@ -371,7 +371,7 @@ int new_player_config()
 //		i = nm_messagebox( TXT_IMPORTANT_NOTE, 2, "Choose another", TXT_OK, TXT_FCS );
 //		if (i==0) goto RetrySelection;
 //	}
-/*	
+/*
 	if ( (Config_control_type>0) && 	(Config_control_type<5) )	{
 		joydefs_set_type(Config_control_type);
 		joydefs_calibrate();
@@ -408,7 +408,8 @@ int read_player_file()
 	save_info info;
 	int errno_ret = 0, rewrite_player_file = 0;
 
-	Assert(Player_num>=0 && Player_num<MAX_PLAYERS);
+	if (!(Player_num>=0 && Player_num<MAX_PLAYERS))
+        Error("Error loading player profiles");
 
 	sprintf(filename,"%s.plr",Players[Player_num].callsign);
 	file = fopen(filename,"rb");
@@ -460,7 +461,7 @@ int read_player_file()
 		//we know is that he made it to level 7.
 		if (info.n_highest_levels==7)
 			highest_levels[0].level_num = 8;
-		
+
 	}
 	else {	//read new highest level info
 
@@ -542,13 +543,13 @@ int read_player_file()
 
 	if ( info.saved_game_version == COMPATIBLE_SAVED_GAME_VERSION )		{
 		int i;
-		
+
 		Assert( N_SAVE_SLOTS == 10 );
 
 		for (i=0; i<N_SAVE_SLOTS; i++ )	{
 			if ( saved_games[i].name[0] )	{
-				state_save_old_game(i, saved_games[i].name, &saved_games[i].player, 
-             		saved_games[i].difficulty_level, saved_games[i].primary_weapon, 
+				state_save_old_game(i, saved_games[i].name, &saved_games[i].player,
+             		saved_games[i].difficulty_level, saved_games[i].primary_weapon,
           			saved_games[i].secondary_weapon, saved_games[i].next_level_num );
 			}
 		}
@@ -565,8 +566,8 @@ int read_player_file()
 
 }
 
-//finds entry for this level in table.  if not found, returns ptr to 
-//empty entry.  If no empty entries, takes over last one 
+//finds entry for this level in table.  if not found, returns ptr to
+//empty entry.  If no empty entries, takes over last one
 int find_hli_entry()
 {
 	int i;
@@ -628,7 +629,7 @@ int get_highest_level(void)
 	if (strlen(Mission_list[Current_mission_num].filename)==0 )	{
 		for (i=0;i<n_highest_levels;i++)
 			if (!stricmp(highest_levels[i].shortname, "DESTSAT")) 	//	Destination Saturn.
-		 		highest_saturn_level = highest_levels[i].level_num; 
+		 		highest_saturn_level = highest_levels[i].level_num;
 	}
 #endif
 #endif
@@ -647,7 +648,7 @@ char filename[64];
 	FILE *file;
 	save_info info;
 	int errno_ret;
-	
+
 	errno_ret = WriteConfigFile();
 
 	info.id = SAVE_FILE_ID;
@@ -727,7 +728,7 @@ char filename[64];
 		remove(filename);			//delete bogus file
 		nm_messagebox(TXT_ERROR, 1, TXT_OK, "%s\n\n%s",TXT_ERROR_WRITING_PLR, strerror(errno_ret));
 	}
-		
+
 	return errno_ret;
 }
 

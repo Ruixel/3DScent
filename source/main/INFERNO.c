@@ -709,7 +709,8 @@ static char copyright[] = "DESCENT   COPYRIGHT (C) 1994,1995 PARALLAX SOFTWARE C
 #include "editor\editor.h"
 #include "editor\kdefs.h"
 #endif
-
+#include <3ds.h>
+#include <citro3d.h>
 #include "vers_id.h"
 
 //extern int Game_simuleyes_flag;
@@ -1127,8 +1128,9 @@ int main(int argc,char **argv)
 	//nds_init ();
 
 	// 3DS Initializing code
-    gfxInitDefault();
-    consoleInit(GFX_TOP, NULL);
+    gfxInit(4,4, true);
+    consoleInit(GFX_BOTTOM, NULL);
+    //gfxSetDoubleBuffering(GFX_BOTTOM, false);
 
     printf("Launching 3DScent...\n");
 
@@ -1416,7 +1418,7 @@ int main(int argc,char **argv)
 	gr_use_palette_table( "PALETTE.256" );
 	//gr_use_palette_table( "PALETTE.256" );
 	mprintf( (0, "\nInitializing font system..." ));
-	gamefont_init();	// must load after palette data loaded.
+	//gamefont_init();	// must load after palette data loaded.
 	songs_play_song( SONG_TITLE, 1 );
 
 
@@ -1571,7 +1573,7 @@ int main(int argc,char **argv)
 		game_init_render_buffers(screen_mode, screen_width, screen_height, use_double_buffer, vr_mode, screen_compatible );
 	}
 */
-		game_init_render_buffers(SM_320x200C, 256, 192 * 2, 0, VR_NONE, 1);
+		game_init_render_buffers(SM_320x200C, 400, 240, 0, VR_NONE, 1);
 /*
 	if (Game_victor_flag) {
 		char *vswitch = getenv( "CYBERMAXX" );
@@ -1659,16 +1661,21 @@ int main(int argc,char **argv)
 	texmerge_init( 10 );		// 10 cache bitmaps
 	printf( (0, "\nRunning game...\n" ));
 	set_screen_mode(SCREEN_MENU);
-	Error("hey");
 
 	init_game();
+
 	set_detail_level_parameters(Detail_level);
+
 	Players[Player_num].callsign[0] = '\0';
+
+    //Error("test");
 
 	if (!Auto_demo) 	{
 		key_flush();
 		RegisterPlayer();		//get player's name
 	}
+
+
 
 //rest	gr_palette_fade_out( gr_palette, 32, 0 );
 

@@ -67,7 +67,7 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
 #define MENU_FONT		(Gamefonts[GFONT_MEDIUM_1])
 #define SCORES_FONT	(Gamefonts[GFONT_MEDIUM_1])
 
-#define MAX_FONTS 4
+#define MAX_FONTS 5
 
 extern grs_font *Gamefonts[MAX_FONTS];
 

@@ -308,12 +308,12 @@ FILE * cfile_find_libfile(const char * name, int * length)
 		Hogfile_initialized = 1;
 	}
 
-	Warning("%s corrupted name", HogFiles[51].name);
+	printf("c\n");
 
     // Search in each hog file for the file we want
 	for (i=0; i<Num_hogfiles; i++ )	{
 		if ( !stricmp( HogFiles[i].name, name ))	{
-            printf("Found in position %d\n", i);
+           // printf("Found in position %d\n", i);
 			fp = cfile_get_filehandle( "DESCENT.HOG", "rb" );
 
 			if ( fp == NULL )

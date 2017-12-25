@@ -65,7 +65,7 @@ char * Gamefont_filenames[] = { 	"font1-1.fnt",			// Font 0
 											"font2-1.fnt",			// Font 1
 											"font2-2.fnt",			// Font 2
 											"font2-3.fnt",			// Font 3
-											"font3-1.fnt",			// Font 4
+											"font1-1.fnt",			// Font 4
 										};
 
 grs_font *Gamefonts[MAX_FONTS];

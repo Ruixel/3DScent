@@ -39,7 +39,7 @@ ITCM_CODE void g3_draw_bitmap (vms_vector *pos,fix width,fix height,grs_bitmap *
 
 #define front_buffer_top	((u16 *)0x06000000)
 #define front_buffer_bottom	((u16 *)0x06200000)
-ALIGN(4) u8	back_buffer[(256 * (192 * 2))];
+ALIGN(4) u8	back_buffer[(400*240)];
 u16	ds_palette[256];
 
 int	palette_updated;
@@ -130,6 +130,7 @@ bool doSleep;
 
 ITCM_CODE void bitblt_to_screen ()
 {
+    hidScanInput();
 	/*scanKeys ();
 /*
 	{
@@ -165,6 +166,20 @@ ITCM_CODE void bitblt_to_screen ()
 	// Clear the FIFO
 //	GFX_STATUS |= (1 << 29) | (1 << 15);
 	swiWaitForVBlank ();*/
+	//printf("Drawing bitblt\n");
+
+	gr_rect(10,20,30,40);
+
+	gfxFlushBuffers();
+    //DC_FlushRange (back_buffer, 256 * 192);
+    u8* framebuffer = gfxGetFramebuffer(GFX_TOP, GFX_LEFT, NULL, NULL);
+    memcpy(framebuffer, back_buffer, 400*240);
+
+    // Flush and swap framebuffers
+    gfxSwapBuffers();
+
+    //Wait for VBlank
+    gspWaitForVBlank();
 }
 
 #ifdef WIFI_DEBUG

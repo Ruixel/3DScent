@@ -174,7 +174,7 @@ ubyte gr_palette_gamma = 0;
 int gr_palette_gamma_param = 0;
 ubyte gr_palette_faded_out = 1;
 
-//extern u16	ds_palette[];
+extern u16	ds_palette[];
 extern int	palette_updated;
 
 void gr_palette_set_gamma( int gamma )
@@ -381,7 +381,7 @@ void gr_palette_step_up( int r, int g, int b )
 		else if (nb>63) nb=63;
 
 //		outp( 0x3c9, temp );
-//		ds_palette[i] = (nr >> 1) | ((ng & ~1) << 4) | ((nb & ~1) << 9);
+		ds_palette[i] = (nr >> 1) | ((ng & ~1) << 4) | ((nb & ~1) << 9);
 	}
 	palette_updated = 1;
 }
@@ -395,8 +395,8 @@ void gr_palette_clear()
 		outp( 0x3c9, 0 );
 	}
 */
-//	for (i=0; i<256; i++)
-//		ds_palette[i] = 0;
+	for (i=0; i<256; i++)
+		ds_palette[i] = 0;
 
 	gr_palette_faded_out = 1;
 	palette_updated = 1;
@@ -429,7 +429,7 @@ void gr_palette_load( ubyte * pal )
 		if ( b > 63 ) b = 63;
  		gr_current_pal[j] = pal[j];	j++;
 
-//		ds_palette[i] = (r >> 1) | ((g & ~1) << 4) | ((b & ~1) << 9);
+		ds_palette[i] = (r >> 1) | ((g & ~1) << 4) | ((b & ~1) << 9);
 	}
 	palette_updated = 1;
 	gr_palette_faded_out = 0;
@@ -485,7 +485,7 @@ int gr_palette_fade_out(ubyte *pal, int nsteps, int allow_keys )
 				fade_palette[j] = 0;
 			b = (ubyte)f2i (fade_palette[j++]);
 			if (b > 63) b = 63;
-//			ds_palette[i] = (r >> 1) | ((g & ~1) << 4) | ((b & ~1) << 9);
+			ds_palette[i] = (r >> 1) | ((g & ~1) << 4) | ((b & ~1) << 9);
 		}
 		palette_updated = 1;
 		bitblt_to_screen ();
@@ -541,7 +541,7 @@ int gr_palette_fade_in(ubyte *pal, int nsteps, int allow_keys)
 				fade_palette[j] = i2f(pal[j]+gr_palette_gamma);
 			b = (ubyte)f2i (fade_palette[j++]);
 			if (b > 63) b = 63;
-//			ds_palette[i] = (r >> 1) | ((g & ~1) << 4) | ((b & ~1) << 9);
+			ds_palette[i] = (r >> 1) | ((g & ~1) << 4) | ((b & ~1) << 9);
 		}
 		palette_updated = 1;
 		bitblt_to_screen ();
