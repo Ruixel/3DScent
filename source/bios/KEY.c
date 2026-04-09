@@ -329,12 +329,12 @@ void keyboard_handler()
 {
 	int keys, pressed;
 
-	pressed = keysDown ();
+	pressed = hidKeysDown ();
 
 	if (!keyd_repeat)
-		keys = keysDownRepeat ();
+		keys = hidKeysDownRepeat ();
 	else
-		keys = keysHeld ();
+		keys = hidKeysHeld ();
 
     // Get Key button presses from the NDS, TODO
 /*	keyboard_updatekey (KEY_RIGHT, keys & nds_KEY_RIGHT ? 1 : 0);

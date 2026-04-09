@@ -76,6 +76,7 @@ static char rcsid[] = "$Id: menu.c 1.1 1995/12/05 16:03:00 allender Exp allender
 #include "mission.h"
 #include "songs.h"
 #include "config.h"
+#include "misc.h"
 
 #ifdef EDITOR
 #include "editor\editor.h"

@@ -57,6 +57,7 @@ static char rcsid[] = "$Id: gamefont.c 2.0 1995/02/27 11:30:14 john Exp $";
 #pragma on (unreferenced)
 */
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "gr.h"
 #include "gamefont.h"

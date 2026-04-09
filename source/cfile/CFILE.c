@@ -134,6 +134,7 @@ static char rcsid[] = "$Id: cfile.c 1.7 1995/10/27 15:18:20 allender Exp allende
 #include <stdarg.h>
 #include <errno.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "cfile.h"
 #include "error.h"

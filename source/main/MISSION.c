@@ -127,6 +127,7 @@ static char rcsid[] = "$Id: mission.c 1.4 1995/10/31 10:21:40 allender Exp allen
 #include "mono.h"
 #include "error.h"
 #include "fileutil.h"
+#include "misc.h"
 
 #ifndef SHAREWARE
 

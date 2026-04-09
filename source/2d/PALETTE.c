@@ -161,7 +161,7 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
 //#include "key.h"
 #include "palette.h"
 #include "misc.h"
-//#include "ndsfunc.h"
+#include "ndsfunc.h"
 
 ubyte gr_palette[256*3];
 ubyte gr_current_pal[256*3];

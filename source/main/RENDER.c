@@ -645,7 +645,7 @@ ITCM_CODE void render_face(int segnum, int sidenum, int nv, short *vp, int tmap1
 	g3_draw_tmap_tex(nv,pointlist, uvl_copy,bm);
 
 	#ifndef NDEBUG
-	if (Outline_mode) draw_outline(nv, pointlist);
+	if (Outline_mode) draw_outline(nv, (g3s_point **)pointlist);
 	#endif
 }
 

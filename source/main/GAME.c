@@ -1355,7 +1355,7 @@ fix Show_view_text_timer = -1;
 
 #ifndef NDEBUG
 
-draw_window_label()
+void draw_window_label()
 {
 	if ( Show_view_text_timer > 0 )
 	{

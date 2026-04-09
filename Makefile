@@ -6,8 +6,8 @@ ifeq ($(strip $(DEVKITARM)),)
 $(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM")
 endif
 
-export DEVKITPRO := C:\devkitPro
-export DEVKITARM := C:\devkitPro\devkitARM
+// export DEVKITPRO := C:\devkitPro
+// export DEVKITARM := C:\devkitPro\devkitARM
 
 TOPDIR ?= $(CURDIR)
 include $(DEVKITARM)/3ds_rules
@@ -44,7 +44,7 @@ RSF             := $(TOPDIR)/$(RESOURCES)/template.rsf
 # options for code generation
 #---------------------------------------------------------------------------------
 ARCH        := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
-COMMON      := -Wall -O2 -mword-relocations -fomit-frame-pointer -ffunction-sections $(ARCH) $(INCLUDE) -DARM11 -D_3DS
+COMMON      := -Wall -O2 -mword-relocations -fomit-frame-pointer -ffunction-sections $(ARCH) $(INCLUDE) -DARM11 -D__3DS__ -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=incompatible-pointer-types
 CFLAGS      := $(COMMON) -std=gnu99
 CXXFLAGS    := $(COMMON) -fno-rtti -fno-exceptions -std=gnu++11
 ASFLAGS     := $(ARCH)
