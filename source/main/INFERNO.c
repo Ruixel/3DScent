@@ -647,6 +647,8 @@ static char copyright[] = "DESCENT   COPYRIGHT (C) 1994,1995 PARALLAX SOFTWARE C
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <dirent.h>
+#include <unistd.h>
 
 #include "gr.h"
 //#include "ui.h"
@@ -1131,6 +1133,22 @@ int main(int argc,char **argv)
     gfxInit(4,4, true);
     consoleInit(GFX_BOTTOM, NULL);
     //gfxSetDoubleBuffering(GFX_BOTTOM, false);
+    romfsInit();
+    chdir("romfs:/");
+
+    // Debug: list romfs contents
+    {
+        DIR *d = opendir(".");
+        struct dirent *entry;
+        printf("romfs contents:\n");
+        if (d) {
+            while ((entry = readdir(d)) != NULL)
+                printf("  %s\n", entry->d_name);
+            closedir(d);
+        } else {
+            printf("  (failed to open)\n");
+        }
+    }
 
     printf("Launching 3DScent...\n");
 

@@ -161,9 +161,10 @@ void load_text()
 
 		Text_string[i] = tptr;
 
+		//printf("hey %d: %s\n", i, tptr);
+
 		tptr = strchr(tptr,0x0a);
 
-		printf("hey %d\n", i);
 		if (!tptr)
 			Error("Not enough strings in text file - expecting %d, found %d\nYou most likely do not have the proper version of the data files\nYou need atleast v1.4a REGISTERED\n",N_TEXT_STRINGS,i);
 
