@@ -388,6 +388,8 @@ static char rcsid[] = "$Id: game.c 1.1 1995/12/05 16:01:09 allender Exp allender
 #include <string.h>
 #include <stdarg.h>
 
+extern unsigned char back_buffer[];
+
 #include "types.h"
 #include "inferno.h"
 #include "game.h"
@@ -750,16 +752,24 @@ void init_cockpit()
 		nds_set_render_size (0, 0, 255, 191);
 		VR_screen_pages[0].cv_bitmap.bm_x = 0;
 		VR_screen_pages[0].cv_bitmap.bm_y = 0;
-		VR_screen_pages[0].cv_bitmap.bm_w = 256;
-		VR_screen_pages[0].cv_bitmap.bm_h = 192;
+		VR_screen_pages[0].cv_bitmap.bm_w = 320;
+		VR_screen_pages[0].cv_bitmap.bm_h = 200;
+		VR_screen_pages[0].cv_bitmap.bm_rowsize = 320;
+		VR_screen_pages[0].cv_bitmap.bm_data = back_buffer;
+		VR_screen_pages[1].cv_bitmap.bm_w = 320;
+		VR_screen_pages[1].cv_bitmap.bm_h = 200;
+		VR_screen_pages[1].cv_bitmap.bm_rowsize = 320;
+		VR_screen_pages[1].cv_bitmap.bm_data = back_buffer;
 		break;
 
 	case CM_LETTERBOX:
 		nds_set_render_size (0, 24, 255, 147);
 		VR_screen_pages[0].cv_bitmap.bm_x = 0;
 		VR_screen_pages[0].cv_bitmap.bm_y = 24;
-		VR_screen_pages[0].cv_bitmap.bm_w = 256;
-		VR_screen_pages[0].cv_bitmap.bm_h = 148;
+		VR_screen_pages[0].cv_bitmap.bm_w = 320;
+		VR_screen_pages[0].cv_bitmap.bm_h = 200;
+		VR_screen_pages[0].cv_bitmap.bm_rowsize = 320;
+		VR_screen_pages[0].cv_bitmap.bm_data = back_buffer;
 		break;
 	}
 
@@ -1148,6 +1158,7 @@ int set_screen_mode(int sm)
 
 //		gr_init_sub_canvas( &VR_screen_pages[0], &VR_offscreen_buffer, 0, 0, 256, 192 );
 //		gr_init_sub_canvas( &VR_screen_pages[1], &VR_offscreen_buffer, 0, 192, 256, 192 );
+		init_cockpit();
 		break;
 	case SCREEN_GAME:
 #if 0

@@ -210,7 +210,7 @@ ITCM_CODE fix fixdiv(fix a, fix b)
 	while(REG_DIVCNT & DIV_BUSY);
 
 	return (REG_DIV_RESULT_L);*/
-	return (a << 16)/b;
+	return (fix)(((long long)a << 16) / b);
 //	return fixdivquadlong(a<<16,a>>16,b);
 }
 

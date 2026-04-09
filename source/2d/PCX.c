@@ -292,14 +292,15 @@ int pcx_read_bitmap( const char * filename, grs_bitmap * bmp,int bitmap_type ,ub
 				else
 					count = 1;
 
-				for (i=0; i<count; i++, fx+=xstep, col++)
+				for (i=0; i<count; i++, col++)
 				{
+					*pixdata = data;
+					fx += xstep;
 					if (fx >= f1_0)
 					{
 						pixdata++;
 						fx -= f1_0;
 					}
-					*pixdata = data;
 				}
 			}
 		}

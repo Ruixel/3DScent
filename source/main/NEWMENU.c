@@ -605,15 +605,15 @@ static char rcsid[] = "$Id: newmenu.c 1.26 1996/04/14 21:07:35 allender Exp alle
 #define TEXT_FONT  		(Gamefonts[GFONT_MEDIUM_3])
 
 #if 0
-#define NORMAL_CHECK_BOX	""
-#define CHECKED_CHECK_BOX	"‚"
+#define NORMAL_CHECK_BOX	"ï¿½"
+#define CHECKED_CHECK_BOX	"ï¿½"
 #define NORMAL_RADIO_BOX	""
-#define CHECKED_RADIO_BOX	"€"
+#define CHECKED_RADIO_BOX	"ï¿½"
 #define CURSOR_STRING		"_"
-#define SLIDER_LEFT			"ƒ"		// 131
-#define SLIDER_RIGHT			"„"		// 132
-#define SLIDER_MIDDLE		"…"		// 133
-#define SLIDER_MARKER		"†"		// 134
+#define SLIDER_LEFT			"ï¿½"		// 131
+#define SLIDER_RIGHT			"ï¿½"		// 132
+#define SLIDER_MIDDLE		"ï¿½"		// 133
+#define SLIDER_MARKER		"ï¿½"		// 134
 #endif
 
 #define CURSOR_STRING		"_"
@@ -660,7 +660,7 @@ void nm_draw_background1(char * filename)
 	bmp = gr_create_sub_bitmap( &grd_curcanv->cv_bitmap, 0, 0, grd_curcanv->cv_bitmap.bm_w, grd_curcanv->cv_bitmap.bm_h );
 	pcx_error = pcx_read_bitmap(filename,bmp,bmp->bm_type,pal);
 	Assert(pcx_error == PCX_ERROR_NONE);
-	
+	gr_palette_load(pal);
 	gr_free_sub_bitmap(bmp);
 }
 

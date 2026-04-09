@@ -167,18 +167,66 @@ ITCM_CODE void bitblt_to_screen ()
 //	GFX_STATUS |= (1 << 29) | (1 << 15);
 	swiWaitForVBlank ();*/
 	//printf("Drawing bitblt\n");
+	
+	//back_buffer[100]=53;
 
-	gr_rect(10,20,30,40);
+
+	// Convert 8-bit indexed back_buffer (320x200) to 3DS BGR8 framebuffer (400x240).
+	// The 3DS top screen is 400x240, stored column-major (each column top-to-bottom).
+	/*
+	extern ubyte gr_current_pal[];  // 256*3 bytes, RGB triplets, 6-bit (0-63)
+	u8* framebuffer = gfxGetFramebuffer(GFX_TOP, GFX_LEFT, NULL, NULL);
+	int x, y;
+	for (x = 0; x < 320; x++) {
+		for (y = 0; y < 200; y++) {
+			u8 idx = back_buffer[y * 320 + x];
+			u8 r = gr_current_pal[idx * 3 + 0] << 2;
+			u8 g = gr_current_pal[idx * 3 + 1] << 2;
+			u8 b = gr_current_pal[idx * 3 + 2] << 2;
+			// Column-major: pixel (x,y) is at offset x*240 + (239-y)
+			int dst = x * 240 + (239 - y);
+			framebuffer[dst * 3 + 0] = b;
+			framebuffer[dst * 3 + 1] = g;
+			framebuffer[dst * 3 + 2] = r;
+		}
+	}
+	*/
+
+	// Blit back_buffer (320x200, 8-bit indexed) to 3DS top screen (400x240, BGR8).
+	// Palette values are 6-bit (0-63); shift left 2 to get 8-bit (0-255).
+	// Centre the 320x200 image: 40px border left/right, 20px border top/bottom.
+	extern ubyte gr_current_pal[];
+	u8* framebuffer = gfxGetFramebuffer(GFX_TOP, GFX_LEFT, NULL, NULL);
+	int x, y;
+
+	// Clear screen to black first
+	for (x = 0; x < 400; x++) {
+		for (y = 0; y < 240; y++) {
+			int dst = x * 240 + (239 - y);
+			framebuffer[dst * 3 + 0] = 0;
+			framebuffer[dst * 3 + 1] = 0;
+			framebuffer[dst * 3 + 2] = 0;
+		}
+	}
+
+	// Blit palette-indexed back_buffer into the centred region
+	for (x = 0; x < 320; x++) {
+		for (y = 0; y < 200; y++) {
+			u8 idx = back_buffer[y * 320 + x];
+			u8 r = gr_current_pal[idx * 3 + 0] << 2;
+			u8 g = gr_current_pal[idx * 3 + 1] << 2;
+			u8 b = gr_current_pal[idx * 3 + 2] << 2;
+			int screen_x = x + 40;
+			int screen_y = y + 20;
+			int dst = screen_x * 240 + (239 - screen_y);
+			framebuffer[dst * 3 + 0] = b;
+			framebuffer[dst * 3 + 1] = g;
+			framebuffer[dst * 3 + 2] = r;
+		}
+	}
 
 	gfxFlushBuffers();
-    //DC_FlushRange (back_buffer, 256 * 192);
-    u8* framebuffer = gfxGetFramebuffer(GFX_TOP, GFX_LEFT, NULL, NULL);
-    memcpy(framebuffer, back_buffer, 400*240);
-
-    // Flush and swap framebuffers
     gfxSwapBuffers();
-
-    //Wait for VBlank
     gspWaitForVBlank();
 }
 

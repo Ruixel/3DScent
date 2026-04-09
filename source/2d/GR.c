@@ -294,8 +294,8 @@ int gr_set_mode(int mode)
 	}
 	*/
 
-	w = 400;
-	h = 256;
+	w = 320;
+	h = 200;
 	gr_palette_clear();
 	grd_curscreen->sc_w = w;
 	grd_curscreen->sc_h = h;

@@ -1130,7 +1130,7 @@ int main(int argc,char **argv)
 	//nds_init ();
 
 	// 3DS Initializing code
-    gfxInit(4,4, true);
+    gfxInit(GSP_BGR8_OES, GSP_BGR8_OES, true);  // BGR8: 3 bytes/pixel, matches our blit code
     consoleInit(GFX_BOTTOM, NULL);
     //gfxSetDoubleBuffering(GFX_BOTTOM, false);
     romfsInit();
@@ -1690,7 +1690,8 @@ int main(int argc,char **argv)
 
 	if (!Auto_demo) 	{
 		key_flush();
-		RegisterPlayer();		//get player's name
+		strcpy(Players[Player_num].callsign, "PLAYER");
+		//RegisterPlayer();		//get player's name
 	}
 
 
