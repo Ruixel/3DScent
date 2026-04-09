@@ -1104,20 +1104,24 @@ int error_init(char *fmt,...);
 void show_pcx (const char *filename)
 {
 	ubyte title_pal[768];
-
-	//grs_bitmap title_bm;
 	int pcx_error;
+	grs_bitmap bmp;
 
-	if ((pcx_error=pcx_read_bitmap( filename, &grd_curcanv->cv_bitmap, grd_curcanv->cv_bitmap.bm_type, title_pal ))==PCX_ERROR_NONE)	{
-//			vfx_set_palette_sub( title_pal );
-		gr_palette_clear();
-		//gr_bitmap( 0, 0, &title_bm );
+	// Decode directly into back_buffer at full 320x200 so bitblt_to_screen works correctly.
+	// grd_curcanv may not be set up yet (VR_screen_pages are still 256x192 at this point).
+	extern ubyte back_buffer[];
+	bmp.bm_x = 0; bmp.bm_y = 0;
+	bmp.bm_w = 320; bmp.bm_h = 200;
+	bmp.bm_rowsize = 320;
+	bmp.bm_type = BM_LINEAR;
+	bmp.bm_data = back_buffer;
+
+	if ((pcx_error = pcx_read_bitmap(filename, &bmp, BM_LINEAR, title_pal)) == PCX_ERROR_NONE) {
+		gr_palette_load(title_pal);
 		bitblt_to_screen();
-		gr_palette_fade_in( title_pal, 32, 0 );
-		//free(title_bm.bm_data);
+		gr_palette_fade_in(title_pal, 32, 0);
 	} else {
-//		gr_close();
-		Error( "Couldn't load pcx file '%s', PCX load error: %s\n",filename, pcx_errormsg(pcx_error));
+		Error("Couldn't load pcx file '%s', PCX load error: %s\n", filename, pcx_errormsg(pcx_error));
 	}
 }
 
