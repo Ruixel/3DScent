@@ -131,6 +131,7 @@ bool doSleep;
 ITCM_CODE void bitblt_to_screen ()
 {
     hidScanInput();
+    keyboard_handler();
 	/*scanKeys ();*/
 /*
 	{

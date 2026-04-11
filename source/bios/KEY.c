@@ -336,32 +336,30 @@ void keyboard_handler()
 	else
 		keys = hidKeysHeld ();
 
-    // Get Key button presses from the NDS, TODO
-/*	keyboard_updatekey (KEY_RIGHT, keys & nds_KEY_RIGHT ? 1 : 0);
-	keyboard_updatekey (KEY_LEFT, keys & nds_KEY_LEFT ? 1 : 0);
-	keyboard_updatekey (KEY_UP, keys & nds_KEY_UP ? 1 : 0);
-	keyboard_updatekey (KEY_DOWN, keys & nds_KEY_DOWN ? 1 : 0);
-	keyboard_updatekey (KEY_R, keys & nds_KEY_R ? 1 : 0);
-	keyboard_updatekey (KEY_L, keys & nds_KEY_L ? 1 : 0);
-	keyboard_updatekey (KEY_A, keys & nds_KEY_A ? 1 : 0);
-	keyboard_updatekey (KEY_B, keys & nds_KEY_B ? 1 : 0);
-	keyboard_updatekey (KEY_X, keys & nds_KEY_X ? 1 : 0);
-	keyboard_updatekey (KEY_Y, keys & nds_KEY_Y ? 1 : 0);
-	if (keys & nds_KEY_START && keys & nds_KEY_SELECT)
-	{
-		if (!old_sk)
-			old_sk = softkey_set_list (NULL);
-		else
-		{
-			softkey_set_list (old_sk);
-			old_sk = NULL;
-		}
-	}
-	else
-	{
-		keyboard_updatekey (KEY_ESC, pressed & nds_KEY_START ? 1 : 0);
-		keyboard_updatekey (KEY_TAB, keys & nds_KEY_SELECT ? 1 : 0);
-	}*/
+	// libctru HID bitmasks — defined locally to avoid conflict with
+	// Descent's KEY_* scan code constants from KEY.h
+	enum {
+		HID_A      = 1<<0,  HID_B      = 1<<1,
+		HID_SELECT = 1<<2,  HID_START  = 1<<3,
+		HID_DRIGHT = 1<<4,  HID_DLEFT  = 1<<5,
+		HID_DUP    = 1<<6,  HID_DDOWN  = 1<<7,
+		HID_R      = 1<<8,  HID_L      = 1<<9,
+		HID_X      = 1<<10, HID_Y      = 1<<11,
+	};
+
+	// Map 3DS buttons → Descent key scan codes
+	keyboard_updatekey (KEY_UP,    keys & HID_DUP    ? 1 : 0);
+	keyboard_updatekey (KEY_DOWN,  keys & HID_DDOWN  ? 1 : 0);
+	keyboard_updatekey (KEY_LEFT,  keys & HID_DLEFT  ? 1 : 0);
+	keyboard_updatekey (KEY_RIGHT, keys & HID_DRIGHT ? 1 : 0);
+	keyboard_updatekey (KEY_A,     keys & HID_A      ? 1 : 0);  // confirm
+	keyboard_updatekey (KEY_B,     keys & HID_B      ? 1 : 0);  // back/cancel
+	keyboard_updatekey (KEY_X,     keys & HID_X      ? 1 : 0);
+	keyboard_updatekey (KEY_Y,     keys & HID_Y      ? 1 : 0);
+	keyboard_updatekey (KEY_R,     keys & HID_R      ? 1 : 0);
+	keyboard_updatekey (KEY_L,     keys & HID_L      ? 1 : 0);
+	keyboard_updatekey (KEY_ESC,   pressed & HID_START  ? 1 : 0);
+	keyboard_updatekey (KEY_TAB,   pressed & HID_SELECT ? 1 : 0);
 }
 /*
 void key_close(void)
