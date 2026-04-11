@@ -112,9 +112,13 @@ ushort				ObjBitmapPtrs[MAX_OBJ_BITMAPS];		// These point back into ObjBitmaps, 
 // Initializes all bitmaps from BITMAPS.TBL file.
 int bm_init()
 {
+	printf("bm_init: start\n");
 	init_polygon_models();
+	printf("bm_init: polygon models init done\n");
 	piggy_init();				// This calls bm_read_all
+	printf("bm_init: piggy_init done\n");
 	piggy_read_sounds();
+	printf("bm_init: done\n");
 	return 0;
 }
 
@@ -406,43 +410,56 @@ void bm_read_all(CFILE * fp)
 {
 	int i;
 
+	printf("bm_read_all: start\n");
 	cfread( &NumTextures, sizeof(int), 1, fp );
+	printf("bm_read_all: NumTextures=%d\n", NumTextures);
 	cfread( Textures, sizeof(bitmap_index), MAX_TEXTURES, fp );
 
 	read_tmap_info(fp);
+	printf("bm_read_all: tmap done\n");
 
 	cfread( Sounds, sizeof(ubyte), MAX_SOUNDS, fp );
 	cfread( AltSounds, sizeof(ubyte), MAX_SOUNDS, fp );
+	printf("bm_read_all: sounds done\n");
 
 	cfread( &Num_vclips, sizeof(int), 1, fp );
 	read_vclip_info(fp);
+	printf("bm_read_all: vclips done, Num_vclips=%d\n", Num_vclips);
 
 	cfread( &Num_effects, sizeof(int), 1, fp );
 	read_effect_info(fp);
+	printf("bm_read_all: effects done\n");
 
 	cfread( &Num_wall_anims, sizeof(int), 1, fp );
 	read_wallanim_info(fp);
+	printf("bm_read_all: wall anims done\n");
 
 	cfread( &N_robot_types, sizeof(int), 1, fp );
 	read_robot_info(fp);
+	printf("bm_read_all: robots done, N_robot_types=%d\n", N_robot_types);
 
 	cfread( &N_robot_joints, sizeof(int), 1, fp );
 	read_robot_joints_info(fp);
+	printf("bm_read_all: joints done\n");
 
 	cfread( &N_weapon_types, sizeof(int), 1, fp );
 	read_weapon_info(fp);
+	printf("bm_read_all: weapons done\n");
 
 	cfread( &N_powerup_types, sizeof(int), 1, fp );
 	read_powerup_info(fp);
+	printf("bm_read_all: powerups done\n");
 
 	cfread( &N_polygon_models, sizeof(int), 1, fp );
+	printf("bm_read_all: reading %d polygon models\n", N_polygon_models);
 	read_polygon_models(fp);
-	
+
 	for (i = 0; i < N_polygon_models; i++) {
 		Polygon_models[i].model_data = malloc(Polygon_models[i].model_data_size);
 		Assert(Polygon_models[i].model_data != NULL);
 		cfread(Polygon_models[i].model_data, sizeof(ubyte), Polygon_models[i].model_data_size, fp);
 	}
+	printf("bm_read_all: polygon model data done\n");
 	polygon_model_fix_align ();
 
 	cfread( Gauges, sizeof(bitmap_index), MAX_GAUGE_BMS, fp );

@@ -694,24 +694,30 @@ int piggy_init()
 	Piggy_fp = cfopen( filename, "rb" );
 	if (Piggy_fp==NULL) return 0;
 
+	printf("piggy_init: reading Pigdata_start\n");
 	cfread( &Pigdata_start, sizeof(int), 1, Piggy_fp );
+	printf("piggy_init: Pigdata_start=%d, calling bm_read_all\n", Pigdata_start);
 #ifdef EDITOR
 	if ( FindArg("-nobm") )
 #endif
 	{
 		bm_read_all( Piggy_fp );	// Note connection to above if!!!
+		printf("piggy_init: bm_read_all done, reading GameBitmapXlat\n");
 		cfread( GameBitmapXlat, sizeof(ushort)*MAX_BITMAP_FILES, 1, Piggy_fp );
+		printf("piggy_init: GameBitmapXlat done\n");
 	}
 
+	printf("piggy_init: seeking to Pigdata_start\n");
 	cfseek( Piggy_fp, Pigdata_start, SEEK_SET );
 	size = cfilelength(Piggy_fp) - Pigdata_start;
 	length = size;
-	mprintf( (0, "\nReading data (%d KB) ", size/1024 ));
+	printf("piggy_init: size=%d KB\n", size/1024);
 
 	cfread( &N_bitmaps, sizeof(int), 1, Piggy_fp );
 	size -= sizeof(int);
 	cfread( &N_sounds, sizeof(int), 1, Piggy_fp );
 	size -= sizeof(int);
+	printf("piggy_init: N_bitmaps=%d N_sounds=%d\n", N_bitmaps, N_sounds);
 
 //	header_size = (N_bitmaps*sizeof(DiskBitmapHeader)) + (N_sounds*sizeof(DiskSoundHeader));
 	header_size = ((N_bitmaps*17) + (N_sounds*20));

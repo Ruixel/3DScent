@@ -306,7 +306,7 @@ int gr_set_mode(int mode)
 	grd_curscreen->sc_canvas.cv_bitmap.bm_type = BM_LINEAR;
 	grd_curscreen->sc_canvas.cv_bitmap.bm_w = w;
 	grd_curscreen->sc_canvas.cv_bitmap.bm_h = h;
-	grd_curscreen->sc_canvas.cv_bitmap.bm_rowsize = 400;
+	grd_curscreen->sc_canvas.cv_bitmap.bm_rowsize = 320;
 	grd_curscreen->sc_canvas.cv_bitmap.bm_data = back_buffer;
 	gr_set_current_canvas(NULL);
 

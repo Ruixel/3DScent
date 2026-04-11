@@ -130,12 +130,13 @@ bool doSleep;
 
 ITCM_CODE void bitblt_to_screen ()
 {
+  printf("bitblt\n");
     hidScanInput();
-	/*scanKeys ();
-/*
+	/*scanKeys ();*/
+
 	{
 		extern grs_font *Gamefonts[];
-		extern soundsys_t *sndsys;
+		//extern soundsys_t *sndsys;
 		extern int Config_master_volume, digi_volume;
 		extern int channel_sounds[];
 		extern char Sounds_name[][9];
@@ -146,12 +147,13 @@ ITCM_CODE void bitblt_to_screen ()
 		gr_clear_canvas (0);
 		gr_set_curfont (Gamefonts[4]);
 		gr_set_fontcolor (153, -1);
+    gr_printf(0, 180, "hiiii :3");
 		for (i=0; i<16; i++)
-			gr_printf (0, i * 10, "%2d %02x %d %02x %02x 0x%08x %04x %4d %s", i, sndsys->channels[i].state, sndsys->channels[i].loop, sndsys->channels[i].vol, sndsys->channels[i].pan, sndsys->channels[i].data, sndsys->channels[i].len, channel_sounds[i], Sounds_name[channel_sounds[i]]);
-		gr_printf (0, 180, "digi : %d max : %d", digi_volume, Config_master_volume);
+			//gr_printf (0, i * 10, "%2d %02x %d %02x %02x 0x%08x %04x %4d %s", i, sndsys->channels[i].state, sndsys->channels[i].loop, sndsys->channels[i].vol, sndsys->channels[i].pan, sndsys->channels[i].data, sndsys->channels[i].len, channel_sounds[i], Sounds_name[channel_sounds[i]]);
+		//gr_printf (0, 180, "digi : %d max : %d", digi_volume, Config_master_volume);
 		gr_set_current_canvas (save_canvas);
 	}
-*/
+
 	/*keyboard_handler ();
 	mouse_handler ();
 
@@ -198,6 +200,7 @@ ITCM_CODE void bitblt_to_screen ()
 	extern ubyte gr_current_pal[];
 	u8* framebuffer = gfxGetFramebuffer(GFX_TOP, GFX_LEFT, NULL, NULL);
 	int x, y;
+  printf("wow\n");
 
 	// Clear screen to black first
 	for (x = 0; x < 400; x++) {

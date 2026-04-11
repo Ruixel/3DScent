@@ -1116,10 +1116,15 @@ void show_pcx (const char *filename)
 	bmp.bm_type = BM_LINEAR;
 	bmp.bm_data = back_buffer;
 
-	if ((pcx_error = pcx_read_bitmap(filename, &bmp, BM_LINEAR, title_pal)) == PCX_ERROR_NONE) {
+printf("show_pcx: calling pcx_read_bitmap '%s'\n", filename); fflush(stdout);
+	pcx_error = pcx_read_bitmap(filename, &bmp, BM_LINEAR, title_pal);
+	printf("show_pcx: pcx_read_bitmap returned %d\n", pcx_error); fflush(stdout);
+	if (pcx_error == PCX_ERROR_NONE) {
+		printf("show_pcx: calling gr_palette_load\n");
 		gr_palette_load(title_pal);
+		printf("show_pcx: calling bitblt_to_screen\n");
 		bitblt_to_screen();
-		gr_palette_fade_in(title_pal, 32, 0);
+		printf("show_pcx: calling gr_palette_fade_in\n"); fflush(stdout);
 	} else {
 		Error("Couldn't load pcx file '%s', PCX load error: %s\n", filename, pcx_errormsg(pcx_error));
 	}
@@ -1129,7 +1134,8 @@ int main(int argc,char **argv)
 {
 //	error_init(NULL);
 
-//	setbuf(stdout, NULL);	// unbuffered output via printf
+
+	setbuf(stdout, NULL);	// unbuffered output via printf
 
 	//nds_init ();
 
@@ -1138,6 +1144,9 @@ int main(int argc,char **argv)
     consoleInit(GFX_BOTTOM, NULL);
     //gfxSetDoubleBuffering(GFX_BOTTOM, false);
     romfsInit();
+
+    freopen("sdmc:/3dscent.log", "w", stdout);
+    setbuf(stdout, NULL);
     chdir("romfs:/");
 
     // Debug: list romfs contents
@@ -1440,8 +1449,15 @@ int main(int argc,char **argv)
 	gr_use_palette_table( "PALETTE.256" );
 	//gr_use_palette_table( "PALETTE.256" );
 	mprintf( (0, "\nInitializing font system..." ));
+  //show_pcx("order01.pcx");
 	//gamefont_init();	// must load after palette data loaded.
 	songs_play_song( SONG_TITLE, 1 );
+
+  
+  //show_pcx("warning.pcx");
+  sleep(1);
+  show_pcx("warning.pcx");
+  printf("hello world\n");
 
 
 /*

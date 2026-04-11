@@ -153,11 +153,13 @@ typedef struct hogfile {
 hogfile HogFiles[MAX_HOGFILES];
 char Hogfile_initialized = 0;
 int Num_hogfiles = 0;
+FILE *Descent_hog_fp = NULL;    // persistent handle — romfs can't handle repeated open/close
 
 hogfile AltHogFiles[MAX_HOGFILES];
 char AltHogfile_initialized = 0;
 int AltNum_hogfiles = 0;
 char AltHogFilename[64];
+FILE *AltDescent_hog_fp = NULL; // persistent handle for alternate HOG
 
 char AltHogDir[64];
 char AltHogdir_initialized = 0;
@@ -282,23 +284,22 @@ void cfile_init_hogfile(char *fname, hogfile * hog_files, int * nfiles )
 
 FILE * cfile_find_libfile(const char * name, int * length)
 {
-	FILE * fp;
 	int i;
 
-	// Alternate HOG File
-	if ( AltHogfile_initialized )	{
-        Warning("ddsds");
-		for (i=0; i<AltNum_hogfiles; i++ )	{
-            Warning("ddsds2");
-			if ( !stricmp( AltHogFiles[i].name, name ))	{
-                Warning("ddsds3");
-				fp = cfile_get_filehandle( AltHogFilename, "rb" );
+  printf("Looking for %s\n", name);
 
-				if ( fp == NULL )
-                    return NULL;
-				fseek( fp,  AltHogFiles[i].offset, SEEK_SET );
+	// Alternate HOG File — use its own persistent handle
+	if ( AltHogfile_initialized )	{
+		for (i=0; i<AltNum_hogfiles; i++ )	{
+			if ( !stricmp( AltHogFiles[i].name, name ))	{
+				if ( AltDescent_hog_fp == NULL ) {
+					AltDescent_hog_fp = cfile_get_filehandle( AltHogFilename, "rb" );
+					if ( AltDescent_hog_fp == NULL )
+						return NULL;
+				}
+				fseek( AltDescent_hog_fp, AltHogFiles[i].offset, SEEK_SET );
 				*length = AltHogFiles[i].length;
-				return fp;
+				return AltDescent_hog_fp;
 			}
 		}
 	}
@@ -309,24 +310,23 @@ FILE * cfile_find_libfile(const char * name, int * length)
 		Hogfile_initialized = 1;
 	}
 
-	printf("c\n");
+	// Open the persistent HOG handle once and reuse it forever.
+	// romfs cannot handle repeated fopen/fclose on the same file.
+	if ( Descent_hog_fp == NULL ) {
+		Descent_hog_fp = cfile_get_filehandle( "DESCENT.HOG", "rb" );
+		if ( Descent_hog_fp == NULL ) {
+			Warning("cfile: couldn't open DESCENT.HOG");
+			return NULL;
+		}
+		printf("HOG: opened DESCENT.HOG (persistent handle)\n");
+	}
 
     // Search in each hog file for the file we want
 	for (i=0; i<Num_hogfiles; i++ )	{
 		if ( !stricmp( HogFiles[i].name, name ))	{
-           // printf("Found in position %d\n", i);
-			fp = cfile_get_filehandle( "DESCENT.HOG", "rb" );
-
-			if ( fp == NULL )
-                return NULL;
-
-			fseek( fp,  HogFiles[i].offset, SEEK_SET );
+			fseek( Descent_hog_fp, HogFiles[i].offset, SEEK_SET );
 			*length = HogFiles[i].length;
-
-			return fp;
-		} else {
-            //printf("%s does not match %s\n", HogFiles[i].name, name);
-            //printf("By %d\n", stricmp( HogFiles[i].name, name ));
+			return Descent_hog_fp;
 		}
 	}
 	Warning("%s could not be found", name);
@@ -357,7 +357,7 @@ int cfexist( const char * filename )
 
 	fp = cfile_find_libfile(filename, &length );
 	if ( fp )	{
-		fclose(fp);
+		// Don't fclose — fp is the persistent HOG handle
 		return 2;		// file found in hog
 	}
 
@@ -399,7 +399,7 @@ CFILE * cfopen(const char * filename, char * mode )
 		cfile = (CFILE *)malloc ( sizeof(CFILE) );
 		if ( cfile == NULL ) {
             Warning("File %s empty", filename);
-			fclose(fp);
+			// Don't fclose fp — it's the persistent HOG handle
 			return NULL;
 		}
 
@@ -408,7 +408,7 @@ CFILE * cfopen(const char * filename, char * mode )
 		// Initialize the data for the cfile
 		cfile->file = fp;
 		cfile->size = length;
-		// Offset in the .hog file
+		// Offset in the .hog file (always > 0 for HOG entries)
 		cfile->lib_offset = ftell( fp );
 		cfile->raw_position = 0;
 		return cfile;
@@ -516,7 +516,10 @@ int cfseek( CFILE *fp, long int offset, int where )
 
 void cfclose( CFILE * fp )
 {
-	fclose(fp->file);
+	// HOG-backed files share a persistent FILE* — never fclose it.
+	// Plain files (lib_offset == 0) own their FILE* and must close it.
+	if (fp->lib_offset == 0)
+		fclose(fp->file);
 	free(fp);
 	return;
 }
