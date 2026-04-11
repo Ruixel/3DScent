@@ -130,7 +130,6 @@ bool doSleep;
 
 ITCM_CODE void bitblt_to_screen ()
 {
-  printf("bitblt\n");
     hidScanInput();
 	/*scanKeys ();*/
 /*
@@ -201,7 +200,6 @@ ITCM_CODE void bitblt_to_screen ()
 	extern ubyte gr_current_pal[];
 	u8* framebuffer = gfxGetFramebuffer(GFX_TOP, GFX_LEFT, NULL, NULL);
 	int x, y;
-  printf("wow\n");
 
 	// Clear screen to black first
 	for (x = 0; x < 400; x++) {

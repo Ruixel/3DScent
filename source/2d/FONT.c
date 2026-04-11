@@ -754,8 +754,6 @@ grs_font * gr_init_font( char * fontname )
 
 		cfread(palette,3,256,fontfile);		//read the palette
 
-    // This is causing a heap corruption
-    //printf("Variables: %p, %p, %d\n", palette, colormap, *freq);
 		build_colormap_good( palette, colormap, freq );
 
 		colormap[TRANSPARENCY_COLOR] = TRANSPARENCY_COLOR;
