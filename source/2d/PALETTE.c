@@ -243,8 +243,7 @@ void add_computed_color(int r, int g, int b, int color_num)
 		add_index = Num_computed_colors;
 		Num_computed_colors++;
 	} else
-//		add_index = rand () & 0x1f;//(rand() * MAX_COMPUTED_COLORS) >> 15;
-		add_index = (random() * MAX_COMPUTED_COLORS) >> 15;
+		add_index = random() % MAX_COMPUTED_COLORS;  // was: overflow bug when random() is large
 
 	Computed_colors[add_index].r = r;
 	Computed_colors[add_index].g = g;
