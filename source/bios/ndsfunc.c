@@ -133,7 +133,7 @@ ITCM_CODE void bitblt_to_screen ()
   printf("bitblt\n");
     hidScanInput();
 	/*scanKeys ();*/
-
+/*
 	{
 		extern grs_font *Gamefonts[];
 		//extern soundsys_t *sndsys;
@@ -153,6 +153,7 @@ ITCM_CODE void bitblt_to_screen ()
 		//gr_printf (0, 180, "digi : %d max : %d", digi_volume, Config_master_volume);
 		gr_set_current_canvas (save_canvas);
 	}
+  */
 
 	/*keyboard_handler ();
 	mouse_handler ();

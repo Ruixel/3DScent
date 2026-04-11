@@ -746,6 +746,7 @@ grs_font * gr_init_font( char * fontname )
 	if (font->ft_flags & FT_KERNED)
 		font->ft_kerndata = ((int) font->ft_kerndata) + ((ubyte *) font);
 
+  // This if statement is causing a heap corruption
 	if (font->ft_flags & FT_COLOR) {		//remap palette
 		ubyte palette[256*3];
 		ubyte colormap[256];

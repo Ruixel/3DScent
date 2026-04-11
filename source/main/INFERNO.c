@@ -1450,7 +1450,7 @@ int main(int argc,char **argv)
 	//gr_use_palette_table( "PALETTE.256" );
 	mprintf( (0, "\nInitializing font system..." ));
   //show_pcx("order01.pcx");
-	//gamefont_init();	// must load after palette data loaded.
+	gamefont_init();	// must load after palette data loaded.
 	songs_play_song( SONG_TITLE, 1 );
 
   
