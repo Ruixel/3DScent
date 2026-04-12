@@ -267,6 +267,9 @@ void credits_show()
 		if (file == NULL)
 			Error("Missing CREDITS.TEX and CREDITS.TXB file\n");
 		have_bin_file = 1;
+		printf("credits: opened credits.txb (binary), length=%d\n", cfilelength(file));
+	} else {
+		printf("credits: opened credits.tex (plain text), length=%d\n", cfilelength(file));
 	}
 
 	gr_use_palette_table( "credits.256" );
@@ -312,14 +315,24 @@ void credits_show()
 			if (cfgets( buffer[buffer_line], 80, file ))	{
 				char *p;
 				if (have_bin_file) {				// is this a binary tbl file
-					size_t	i;
-					for (i = 0; i < strlen(buffer[buffer_line]) - 1; i++) {
-						encode_rotate_left(&(buffer[buffer_line][i]));
-						buffer[buffer_line][i] ^= BITMAP_TBL_XOR;
-						encode_rotate_left(&(buffer[buffer_line][i]));
+					size_t	i, raw_len;
+					raw_len = strlen(buffer[buffer_line]);
+					// Debug: print raw bytes before decode
+					printf("credits raw (%zu):", raw_len);
+					for (i = 0; i < raw_len && i < 16; i++)
+						printf(" %02X", (unsigned char)buffer[buffer_line][i]);
+					printf("\n");
+					// Guard against size_t underflow when string is empty
+					if (raw_len > 1) {
+						for (i = 0; i < raw_len - 1; i++) {
+							encode_rotate_left(&(buffer[buffer_line][i]));
+							buffer[buffer_line][i] ^= BITMAP_TBL_XOR;
+							encode_rotate_left(&(buffer[buffer_line][i]));
+						}
 					}
 				}
 				p = strchr(&buffer[buffer_line][0],'\n');
+				printf("credits decoded: %s\n", buffer[buffer_line]);
 				if (p) *p = '\0';
 			} else	{
 				//fseek( file, 0, SEEK_SET);
@@ -334,7 +347,10 @@ void credits_show()
 
 			y = first_line_offset - i;
 
-//			gr_set_current_canvas(&VR_offscreen_buffer);
+			// Redraw the full backdrop to clear previous frame's text,
+			// avoiding broken dirty-rect logic that used wrong screen width / negative mod.
+			gr_bitmap(0, 0, &backdrop);
+
 			for (j=0; j<NUM_LINES; j++ )	{
 				char *s;
 
@@ -353,16 +369,7 @@ void credits_show()
 					grd_curcanv->cv_font = names_font;
 
 				gr_bitblt_fade_table = fade_values;
-
-				{
-					int w, h, aw;
-					gr_get_string_size( s, &w, &h, &aw );
-					dirty_box[j].width = w;
-					dirty_box[j].height = h;
-					dirty_box[j].top = y;
-					dirty_box[j].left = (256 - w) / 2;
-					gr_printf( 0x8000, y, s );
-				}
+				gr_printf( 0x8000, y, s );
 				gr_bitblt_fade_table = NULL;
 				if (buffer[l][0] == '!')
 					y += ROW_SPACING/2;
@@ -371,32 +378,7 @@ void credits_show()
 			}
 
 			{
-				box	*new_box;
-				
-				for (j=0; j<NUM_LINES; j++ )
-				{
-					new_box = &dirty_box[j];
-
-/*					gr_bm_bitblt( new_box->width + 1, new_box->height + 2,
-									new_box->left, new_box->top, new_box->left, new_box->top,
-									&(VR_offscreen_buffer->cv_bitmap), &(grd_curscreen->sc_canvas.cv_bitmap) );
-*/				}
-
 				bitblt_to_screen();
-
-				for (j=0; j<NUM_LINES; j++ )
-				{
-					new_box = &dirty_box[j];
-					gr_bm_bitblt(   new_box->width
-									,new_box->height + 2
-									,new_box->left
-									,new_box->top
-									,new_box->left
-									,new_box->top % 192
-									,&backdrop
-									,&(VR_offscreen_buffer.cv_bitmap) );
-				}
-				
 			}
 
 			while( timer_get_fixed_seconds() < last_time+time_delay );
