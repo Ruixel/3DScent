@@ -565,6 +565,7 @@ static char rcsid[] = "$Id: newmenu.c 1.26 1996/04/14 21:07:35 allender Exp alle
 #include <string.h>
 #include <stdarg.h>
 #include <ctype.h>
+#include "3ds.h"  // for swkbd (3DS software keyboard)
 #include <unistd.h>
 
 #include "error.h"
@@ -1060,7 +1061,7 @@ int newmenu_do4( char * title, char * subtitle, int nitems, newmenu_item * item,
 		if (item[i].type == NM_TYPE_INPUT ||
 			item[i].type == NM_TYPE_INPUT_MENU)
 		{
-			show_sk = 1;
+			//show_sk = 1;
 			VR_current_page = 0;
 			close_box = 0;
 			break;
@@ -1479,13 +1480,27 @@ int newmenu_do4( char * title, char * subtitle, int nitems, newmenu_item * item,
 		case KEY_A:
 		case KEY_ENTER:
 		case KEY_PADENTER:
-			if (all_text)	
+			if (all_text)
 			{
 				done = 1;
 				break;
 			}
-			if (show_sk && k == KEY_A)
+			if ( choice > -1 && item[choice].type == NM_TYPE_INPUT )	{
+				// Use 3DS system software keyboard for text input
+				SwkbdState swkbd;
+				char buf[NM_MAX_TEXT_LEN + 1];
+				swkbdInit(&swkbd, SWKBD_TYPE_NORMAL, 2, item[choice].text_len);
+				swkbdSetInitialText(&swkbd, item[choice].text);
+				SwkbdButton btn = swkbdInputText(&swkbd, buf, sizeof(buf));
+				if (btn == SWKBD_BUTTON_CONFIRM) {
+					strncpy(item[choice].text, buf, item[choice].text_len);
+					item[choice].text[item[choice].text_len] = '\0';
+					item[choice].value = strlen(item[choice].text);
+					item[choice].redraw = 1;
+					done = 1;
+				}
 				break;
+			}
 			if ( choice > -1 )	{
 				switch( item[choice].type )	{
 				case NM_TYPE_MENU:
