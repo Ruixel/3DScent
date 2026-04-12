@@ -311,8 +311,6 @@ int gr_internal_string0(int x, int y, char *s )
 				}
 
 			if (FFLAGS & FT_PROPORTIONAL) {
-				printf("gr_color_str: char='%c'(%d) letter=%d FCHARS[%d]=%p\n",
-				       *text_ptr, (int)*text_ptr, letter, letter, FCHARS[letter]);
 				fp = FCHARS[letter];
 			} else
 					fp = FDATA + letter * BITS_TO_BYTES(width)*FHEIGHT;
@@ -454,8 +452,6 @@ int gr_internal_color_string(int x, int y, char *s )
 	char * text_ptr, * next_row, * text_ptr1;
 	int width, spacing,letter;
 	int xx,yy;
-printf("gr_internal_color_string: x=%d y=%d s='%s' FONT=%p ft_chars=%p\n",
-	       x, y, s, FONT, FONT->ft_chars);
 	grs_bitmap char_bm = {
 					0,0,0,0,						//x,y,w,h
 					BM_LINEAR,					//type
@@ -523,7 +519,6 @@ printf("gr_internal_color_string: x=%d y=%d s='%s' FONT=%p ft_chars=%p\n",
 
 int gr_string(int x, int y, char *s )
 {
-  printf("Printing %s\n", s);
 	int w, h, aw;
 	int clipped=0;
 
@@ -578,9 +573,6 @@ int gr_ustring(int x, int y, char *s )
 {
 	if (!FONT) { printf("gr_ustring: FONT is NULL\n"); return 0; }
  
-	printf("gr_ustring: FONT=%p flags=0x%x chars=%p widths=%p data=%p\n",
-	       FONT, FONT->ft_flags, FONT->ft_chars, FONT->ft_widths, FONT->ft_data);
-
 	if (FFLAGS & FT_COLOR) {
 
 		return gr_internal_color_string(x,y,s);
@@ -648,7 +640,6 @@ int gr_uprintf( int x, int y, char * format, ... )
 
 int gr_printf( int x, int y, char * format, ... )
 {
-  printf("going to try to print %s\n", format);
 	char buffer[1000];
 	va_list args;
 
@@ -696,27 +687,11 @@ grs_font * gr_init_font( char * fontname )
 
 	nchars = font->ft_maxchar-font->ft_minchar+1;
 
-	printf("font: flags=0x%x minchar=%d maxchar=%d nchars=%d w=%d h=%d\n",
-	       font->ft_flags, font->ft_minchar, font->ft_maxchar, nchars,
-	       font->ft_w, font->ft_h);
-	printf("font: raw ft_widths=0x%x ft_data=0x%x (before fixup)\n",
-	       (int)font->ft_widths, (int)font->ft_data);
- 
 	if (font->ft_flags & FT_PROPORTIONAL) {
  
 		font->ft_widths = (short *) (((int) font->ft_widths) + ((ubyte *) font));
  
 		font->ft_data = ((int) font->ft_data) + ((ubyte *) font);
- 
-		printf("font: ft_widths=%p ft_data=%p font=%p (after fixup)\n",
-		       font->ft_widths, font->ft_data, font);
-		printf("font: ft_widths offset=%d ft_data offset=%d (should be within [0,%d])\n",
-		       (int)((ubyte*)font->ft_widths - (ubyte*)font),
-		       (int)(font->ft_data - (ubyte*)font),
-		       datasize);
-		printf("font: first few widths: %d %d %d %d %d\n",
-		       font->ft_widths[0], font->ft_widths[1], font->ft_widths[2],
-		       font->ft_widths[3], font->ft_widths[4]);
  
 		font->ft_chars = (unsigned char **)malloc( nchars * sizeof(unsigned char *));
  
@@ -729,9 +704,6 @@ grs_font * gr_init_font( char * fontname )
 			else
 				ptr += BITS_TO_BYTES(font->ft_widths[i]) * font->ft_h;
 		}
- 
-		printf("font: pixel data size=%d (ptr-ft_data), datasize=%d\n",
-		       (int)(ptr - font->ft_data), datasize);
 
 	} else  {
 
