@@ -1716,38 +1716,40 @@ int newmenu_do4( char * title, char * subtitle, int nitems, newmenu_item * item,
 		if ( choice > -1 )	{
 			unsigned char ascii;
 
-			if ( ((item[choice].type==NM_TYPE_INPUT)||((item[choice].type==NM_TYPE_INPUT_MENU)&&(item[choice].group==1)) )&& (old_choice==choice) )	{
-				if ( k==KEY_LEFT || k==KEY_BACKSP || k==KEY_PAD4 )	{
-					if (item[choice].value==-1) item[choice].value = strlen(item[choice].text);
-					if (item[choice].value > 0)
-						item[choice].value--;
-					item[choice].text[item[choice].value] = 0;
-					item[choice].redraw = 1;	
-				} else {
-					ascii = key_to_ascii(k);
-					if ((ascii < 255 ) && (item[choice].value < item[choice].text_len ))
-					{
-						int allowed;
+			 if ( ((item[choice].type==NM_TYPE_INPUT)||((item[choice].type==NM_TYPE_INPUT_MENU)&&(item[choice].group==1)) )&& (old_choice==choice) )	{
+			 	if ( k==KEY_LEFT || k==KEY_BACKSP || k==KEY_PAD4 )	{
+			 		if (item[choice].value==-1) item[choice].value = strlen(item[choice].text);
+			 		if (item[choice].value > 0)
+			 			item[choice].value--;
+			 		item[choice].text[item[choice].value] = 0;
+			 		item[choice].redraw = 1;	
+			 	} else {
+			 		ascii = key_to_ascii(k);
+			 		if ((ascii < 255 ) && (item[choice].value < item[choice].text_len ))
+			 		{
+			 			int allowed;
 
-						if (item[choice].value==-1) {
-							item[choice].value = 0;
-						}
+			 			if (item[choice].value==-1) {
+			 				item[choice].value = 0;
+			 			}
 
-						allowed = char_allowed(ascii);
+            // Don't input any keyboard presses to the input, rely solely on the 3ds' software input
+			 			//allowed = char_allowed(ascii);
+			 			allowed = false;
 
-						if (!allowed && ascii==' ' && char_allowed('_')) {
-							ascii = '_';
-							allowed=1;
-						}
+			 			if (!allowed && ascii==' ' && char_allowed('_')) {
+			 				ascii = '_';
+			 				allowed=1;
+			 			}
 
-						if (allowed) {
-							item[choice].text[item[choice].value++] = ascii;
-							item[choice].text[item[choice].value] = 0;
-							item[choice].redraw=1;	
-						}
-					}
-				}
-			}/* else if ((item[choice].type!=NM_TYPE_INPUT) && (item[choice].type!=NM_TYPE_INPUT_MENU) ) {
+			 			if (allowed) {
+			 				item[choice].text[item[choice].value++] = ascii;
+			 				item[choice].text[item[choice].value] = 0;
+			 				item[choice].redraw=1;	
+			 			}
+			 		}
+			 	}
+			 }/* else if ((item[choice].type!=NM_TYPE_INPUT) && (item[choice].type!=NM_TYPE_INPUT_MENU) ) {
 				ascii = key_to_ascii(k);
 				if (ascii < 255 ) {
 					int choice1 = choice;
