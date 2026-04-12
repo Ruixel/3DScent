@@ -1181,7 +1181,7 @@ int show_briefing_screen( int screen_num, int allow_keys)
 //	vfx_set_palette_sub( New_pal );
 	gr_palette_clear();
 //	gr_bitmap( 0, 0, &briefing_bm );
-	bitblt_to_screen();
+	//bitblt_to_screen();
 
 	if (gr_palette_fade_in( New_pal, 32, allow_keys ))
 		return 1;

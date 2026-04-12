@@ -299,7 +299,7 @@ void credits_show()
 	gr_set_current_canvas(&VR_offscreen_buffer);
 	gr_bitmap(0,0,&backdrop);
 	gr_bitmap(0,192,&backdrop);
-	bitblt_to_screen();
+	//bitblt_to_screen();
 	gr_palette_fade_in( gr_palette, 32, 0 );
 //	gr_bitmap(0,0,&backdrop);
 

@@ -440,111 +440,42 @@ void gr_palette_load( ubyte * pal )
 
 int gr_palette_fade_out(ubyte *pal, int nsteps, int allow_keys )
 {
-	ubyte r, g, b;
-	int i,j,l;
-	fix fade_palette[768];
-	fix fade_palette_delta[768];
+	int i, l;
 
 	if (gr_palette_faded_out) return 0;
 
-	for (i=0; i<768; i++ )	{
-		fade_palette[i] = i2f(pal[i]+gr_palette_gamma);
-		fade_palette_delta[i] = fade_palette[i] / nsteps;
+	// Interpolate gr_current_pal from pal → 0 over nsteps.
+	// bitblt_to_screen reads gr_current_pal directly for colour lookup.
+	for (l = nsteps - 1; l >= 0; l--) {
+		for (i = 0; i < 768; i++)
+			gr_current_pal[i] = (ubyte)((int)pal[i] * l / nsteps);
+		bitblt_to_screen();
 	}
 
-	for (l=0; l<nsteps; l++ )	{
-//		gr_sync_display();
-/*		outp( 0x3c6, 0xff );
-		outp( 0x3c8, 0 );
-		for (i=0; i<768; i++ )	{
-			fade_palette[i] -= fade_palette_delta[i];
-			if (fade_palette[i] < 0 )
-				fade_palette[i] = 0;
-			c = f2i(fade_palette[i]);
-			if ( c > 63 ) c = 63;
-//			outp( 0x3c9, c );
-		}
-*/
-		for (i=0, j=0; i<256; i++)
-		{
-			fade_palette[j] -= fade_palette_delta[j];
-			if (fade_palette[j] < 0 )
-				fade_palette[j] = 0;
-			r = (ubyte)f2i (fade_palette[j++]);
-			if (r > 63) r = 63;
+	// Ensure fully black at the end
+	for (i = 0; i < 768; i++) gr_current_pal[i] = 0;
 
-			fade_palette[j] -= fade_palette_delta[j];
-			if (fade_palette[j] < 0 )
-				fade_palette[j] = 0;
-			g = (ubyte)f2i (fade_palette[j++]);
-			if (g > 63) g = 63;
-
-			fade_palette[j] -= fade_palette_delta[j];
-			if (fade_palette[j] < 0 )
-				fade_palette[j] = 0;
-			b = (ubyte)f2i (fade_palette[j++]);
-			if (b > 63) b = 63;
-			ds_palette[i] = (r >> 1) | ((g & ~1) << 4) | ((b & ~1) << 9);
-		}
-		palette_updated = 1;
-		bitblt_to_screen ();
-	}
 	gr_palette_faded_out = 1;
 	return 0;
 }
 
 int gr_palette_fade_in(ubyte *pal, int nsteps, int allow_keys)
 {
-	int i,j,l;
-	ubyte r,g,b;
-	fix fade_palette[768];
-	fix fade_palette_delta[768];
+	int i, l;
 
 	if (!gr_palette_faded_out) return 0;
 
-	for (i=0; i<768; i++ )	{
-		gr_current_pal[i] = pal[i];
-		fade_palette[i] = 0;
-		fade_palette_delta[i] = i2f(pal[i]+gr_palette_gamma) / nsteps;
+	// Interpolate gr_current_pal from 0 → pal over nsteps.
+	// bitblt_to_screen reads gr_current_pal directly for colour lookup.
+	for (l = 1; l <= nsteps; l++) {
+		for (i = 0; i < 768; i++)
+			gr_current_pal[i] = (ubyte)((int)pal[i] * l / nsteps);
+		bitblt_to_screen();
 	}
 
-	for (l=0; l<nsteps; l++ )	{
-//		gr_sync_display();
-/*		outp( 0x3c6, 0xff );
-		outp( 0x3c8, 0 );
-		for (i=0; i<768; i++ )	{
-			fade_palette[i] += fade_palette_delta[i];
-			if (fade_palette[i] > i2f(pal[i]+gr_palette_gamma) )
-				fade_palette[i] = i2f(pal[i]+gr_palette_gamma);
-			c = f2i(fade_palette[i]);
-			if ( c > 63 ) c = 63;
-			outp( 0x3c9, c );
-		}
-*/
-		for (i=0, j=0; i<256; i++)
-		{
-			fade_palette[j] += fade_palette_delta[j];
-			if (fade_palette[j] > i2f(pal[j]+gr_palette_gamma) )
-				fade_palette[j] = i2f(pal[j]+gr_palette_gamma);
-			r = (ubyte)f2i (fade_palette[j++]);
-			if (r > 63) r = 63;
+	// Ensure palette exactly matches target at the end
+	for (i = 0; i < 768; i++) gr_current_pal[i] = pal[i];
 
-			fade_palette[j] += fade_palette_delta[j];
-			if (fade_palette[j] > i2f(pal[j]+gr_palette_gamma) )
-				fade_palette[j] = i2f(pal[j]+gr_palette_gamma);
-			g = (ubyte)f2i (fade_palette[j++]);
-			if (g > 63) g = 63;
-
-			fade_palette[j] += fade_palette_delta[j];
-			if (fade_palette[j] > i2f(pal[j]+gr_palette_gamma) )
-				fade_palette[j] = i2f(pal[j]+gr_palette_gamma);
-			b = (ubyte)f2i (fade_palette[j++]);
-			if (b > 63) b = 63;
-			ds_palette[i] = (r >> 1) | ((g & ~1) << 4) | ((b & ~1) << 9);
-		}
-		palette_updated = 1;
-		bitblt_to_screen ();
-	}
 	gr_palette_faded_out = 0;
 	return 0;
 }
