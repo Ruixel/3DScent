@@ -31,21 +31,18 @@ void delay(int d_time)
 }
 */
 
-TickCounter tickCounter;
-
-ITCM_CODE void CountUpTick(void)
-{
-    osTickCounterUpdate(&tickCounter);
-}
-
+// osGetTime() returns monotonic milliseconds directly from the 3DS system clock,
+// requiring no interrupt handler or manual update calls.
+// Convert to fix: F1_0 = 0x10000 = 1 second, so ms * 65536 / 1000.
+// The result wraps in int32 for large times but elapsed differences remain correct.
 ITCM_CODE fix timer_get_fixed_seconds ()
 {
-    return (fix) (osTickCounterRead(&tickCounter));
+    return (fix) ((u64)osGetTime() * 0x10000 / 1000);
 }
 
 void timer_init ()
 {
-	osTickCounterStart(&tickCounter);
+    // nothing to initialise — osGetTime() reads the system clock directly
 }
 
 void delay(int d_time)
