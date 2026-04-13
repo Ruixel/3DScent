@@ -325,6 +325,7 @@ static char rcsid[] = "$Id: render.c 1.9 1995/11/20 17:17:48 allender Exp $";
 #include <stdlib.h>
 #include <string.h>
 
+#include "ndsfunc.h"
 #include "inferno.h"
 #include "segment.h"
 #include "error.h"
@@ -857,7 +858,7 @@ ITCM_CODE void do_render_object(int objnum)
 
 	#ifndef NDEBUG
 	if (object_rendered[objnum]) {		//already rendered this...
-		Int3();		//get Matt!!!
+		//Int3();		//get Matt!!!
 		return;
 	}
 	object_rendered[objnum] = 1;
@@ -949,6 +950,8 @@ ITCM_CODE void render_start_frame()
 		memset(Rotated_last,0,sizeof(Rotated_last));		//clear all to zero
 		RL_framecount=1;											//and set this frame to 1
 	}
+
+  ds_start_frame();
 }
 
 //Given a lit of point numbers, rotate any that haven't been rotated this frame
@@ -1800,6 +1803,7 @@ ITCM_CODE void render_frame(fix eye_offset)
 		draw_3d_reticle(eye_offset);
 #endif
 	g3_end_frame();
+  ds_end_frame();
 
 	FrameCount++;		//we have rendered a frame
 }

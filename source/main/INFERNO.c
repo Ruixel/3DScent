@@ -1146,8 +1146,10 @@ int main(int argc,char **argv)
     //gfxSetDoubleBuffering(GFX_BOTTOM, false);
     romfsInit();
 
-    // freopen("sdmc:/3dscent.log", "w", stdout);
-    // setbuf(stdout, NULL);
+    init_3ds_gpu();
+
+    //freopen("sdmc:/3dscent.log", "w", stdout);
+    //setbuf(stdout, NULL);
     chdir("sdmc:/3dscent/");
 
     // Debug: list romfs contents
