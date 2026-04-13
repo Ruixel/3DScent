@@ -1140,14 +1140,15 @@ int main(int argc,char **argv)
 	//nds_init ();
 
 	// 3DS Initializing code
-    gfxInit(GSP_BGR8_OES, GSP_BGR8_OES, true);  // BGR8: 3 bytes/pixel, matches our blit code
+    //gfxInit(GSP_BGR8_OES, GSP_BGR8_OES, true);  // BGR8: 3 bytes/pixel, matches our blit code
+    gfxInitDefault();
     consoleInit(GFX_BOTTOM, NULL);
     //gfxSetDoubleBuffering(GFX_BOTTOM, false);
     romfsInit();
 
-    freopen("sdmc:/3dscent.log", "w", stdout);
-    setbuf(stdout, NULL);
-    chdir("romfs:/");
+    // freopen("sdmc:/3dscent.log", "w", stdout);
+    // setbuf(stdout, NULL);
+    chdir("sdmc:/3dscent/");
 
     // Debug: list romfs contents
     {

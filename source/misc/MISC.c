@@ -48,14 +48,21 @@ void string_tolower(char s1[])
 
 int strnicmp(char *s1, char *s2, int n)
 {
-    string_tolower(s1);
-    string_tolower(s2);
-    return strncmp(s1, s2, n);
+    while (n-- > 0) {
+        int c1 = tolower((unsigned char)*s1++);
+        int c2 = tolower((unsigned char)*s2++);
+        if (c1 != c2) return c1 - c2;
+        if (c1 == 0) return 0;
+    }
+    return 0;
 }
 
 int stricmp(char *s1, char *s2)
 {
-    string_tolower(s1);
-    string_tolower(s2);
-    return strcmp(s1, s2);
+    while (1) {
+        int c1 = tolower((unsigned char)*s1++);
+        int c2 = tolower((unsigned char)*s2++);
+        if (c1 != c2) return c1 - c2;
+        if (c1 == 0) return 0;
+    }
 }
