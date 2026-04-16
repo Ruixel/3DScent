@@ -68,6 +68,7 @@ typedef struct texture_ll_s
 
 texture_ll_t	texture_ll_pool[MAX_TEX_BUFFER], *texture_ll, *texture_ll_free;
 
+
 // 3ds shit
 C3D_RenderTarget* target;
 
@@ -77,23 +78,41 @@ static int uLoc_projection;
 static C3D_Mtx projection;
 static void* vbo_data;
 
-#define CLEAR_COLOR 0x68B0D8FF
+#define CLEAR_COLOR 0x000000FF
 
 #define DISPLAY_TRANSFER_FLAGS \
-	(GX_TRANSFER_FLIP_VERT(0) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) | \
-	GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8) | \
-	GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
+    (GX_TRANSFER_FLIP_VERT(0) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) | \
+    GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8) | \
+    GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
 
-typedef struct { float x, y, z; } vertex;
+// Vertex: position xyz + texcoord uv
+typedef struct { float x, y, z; float u, v; } vertex;
 
-static const vertex vertex_list[] =
-{
-	{ 200.0f, 200.0f, 0.5f },
-	{ 100.0f, 40.0f, 0.5f },
-	{ 300.0f, 40.0f, 0.5f },
+// back_buffer is 320x200, texture is 512x256 (power-of-2)
+#define QUAD_X_MARGIN  40.0f
+#define QUAD_Y_MARGIN  20.0f
+#define QUAD_X0        QUAD_X_MARGIN 
+#define QUAD_X1        400.0f - QUAD_X_MARGIN
+#define QUAD_Y0        QUAD_Y_MARGIN 
+#define QUAD_Y1        240.0f - QUAD_Y_MARGIN
+#define QUAD_TEX_U     (320.0f / 512.0f)
+#define QUAD_TEX_V     (56.0f / 256.0f)
+
+static const vertex quad_list[] = {
+    // Triangle 1 — V coords flipped so texture is right-side up
+    { QUAD_X0, QUAD_Y1, 0.5f, 0.0f,      QUAD_TEX_V}, // top-left
+    { QUAD_X1, QUAD_Y1, 0.5f, QUAD_TEX_U,QUAD_TEX_V}, // top-right
+    { QUAD_X1, QUAD_Y0, 0.5f, QUAD_TEX_U,1.0f      }, // bottom-right
+    // Triangle 2
+    { QUAD_X0, QUAD_Y1, 0.5f, 0.0f,      QUAD_TEX_V}, // top-left
+    { QUAD_X1, QUAD_Y0, 0.5f, QUAD_TEX_U,1.0f      }, // bottom-right
+    { QUAD_X0, QUAD_Y0, 0.5f, 0.0f,      1.0f      }, // bottom-left
 };
+#define quad_list_count 6
 
-#define vertex_list_count (sizeof(vertex_list)/sizeof(vertex_list[0]))
+// GPU texture and linear staging buffer for back_buffer
+static C3D_Tex back_tex;
+static void*   tex_buf; // linearAlloc'd RGBA8, 512x256
 
 /*ITCM_CODE void ITCM_DC_FlushRange (void *base, u32 size)
 {
@@ -158,109 +177,76 @@ ITCM_CODE void irq_Vblank (void)
 
 bool doSleep;
 
-ITCM_CODE void bitblt_to_screen ()
+// Upload a linear RGBA8 buffer into a tiled PICA200 texture using software
+// Morton-code tiling, bypassing GX_DisplayTransfer which produces wrong results
+// for our 512-wide staging buffer.
+//
+// PICA200 tiling: 8x8 pixel base tiles in Z-order (Morton code), tiles
+// themselves arranged row-major across the texture.
+//
+// src_linear : pointer to linearAlloc'd RGBA8 buffer, src_stride u32s per row
+// src_w/h    : pixel region to copy (320x200 for us)
+// tex_w      : full texture width in pixels (512) — used as tile-row stride
+static void tex_upload_software(C3D_Tex* tex,
+                                const u32* src_linear, int src_stride,
+                                int src_w, int src_h, int tex_w)
+{
+    u32* dst = (u32*)tex->data;
+    int tiles_per_row = tex_w / 8; // 64
+
+    for (int y = 0; y < src_h; y++) {
+        for (int x = 0; x < src_w; x++) {
+            int px = x & 7, py = y & 7;
+            // Interleave bits of px and py to get Z-order index within tile
+            int z = (px & 1)        | ((py & 1) << 1) |
+                    ((px & 2) << 1) | ((py & 2) << 2) |
+                    ((px & 4) << 2) | ((py & 4) << 3);
+            int tile_idx = (y / 8) * tiles_per_row + (x / 8);
+            dst[tile_idx * 64 + z] = src_linear[y * src_stride + x];
+            //dst[tile_idx * 64 + z] = src_linear[(255 - y) * src_stride + x];
+        }
+    }
+    // Flush so GPU sees the freshly-tiled data
+    C3D_TexFlush(tex);
+}
+
+void bitblt_to_screen()
 {
     hidScanInput();
     keyboard_handler();
-	/*scanKeys ();*/
-/*
-	{
-		extern grs_font *Gamefonts[];
-		//extern soundsys_t *sndsys;
-		extern int Config_master_volume, digi_volume;
-		extern int channel_sounds[];
-		extern char Sounds_name[][9];
-		int	i;
-		grs_canvas	*save_canvas;
-		save_canvas = grd_curcanv;
-		gr_set_current_canvas (&VR_screen_pages[0]);
-		gr_clear_canvas (0);
-		gr_set_curfont (Gamefonts[4]);
-		gr_set_fontcolor (153, -1);
-    gr_printf(0, 180, "hiiii :3");
-		for (i=0; i<16; i++)
-			//gr_printf (0, i * 10, "%2d %02x %d %02x %02x 0x%08x %04x %4d %s", i, sndsys->channels[i].state, sndsys->channels[i].loop, sndsys->channels[i].vol, sndsys->channels[i].pan, sndsys->channels[i].data, sndsys->channels[i].len, channel_sounds[i], Sounds_name[channel_sounds[i]]);
-		//gr_printf (0, 180, "digi : %d max : %d", digi_volume, Config_master_volume);
-		gr_set_current_canvas (save_canvas);
-	}
-  */
 
-	/*keyboard_handler ();
-	mouse_handler ();
+    // Convert palette-indexed back_buffer (320x200) to RGBA8 in the staging buffer.
+    // Palette entries are 6-bit (0-63), shift left 2 to get 8-bit (0-252).
+    // GPU_RGBA8 in memory is little-endian 32-bit 0xRRGGBBAA → bytes [A, B, G, R].
+    extern ubyte gr_current_pal[];
+    int x, y;
+    for (y = 0; y < 200 + 56; y++) {
+        const u8* src = back_buffer + y * 320;
+        u32*      dst = (u32*)tex_buf + y * 512;
+        for (x = 0; x < 320; x++) {
+            u8 idx = src[x];
+            u8 r = gr_current_pal[idx*3+0] << 2;
+            u8 g = gr_current_pal[idx*3+1] << 2;
+            u8 b = gr_current_pal[idx*3+2] << 2;
+            // GPU_RGBA8 in little-endian memory: byte[0]=A, [1]=B, [2]=G, [3]=R
+            // As a u32: R<<24 | G<<16 | B<<8 | A
+            dst[x] = ((u32)r << 24) | ((u32)g << 16) | ((u32)b << 8) | 0xFF;
+        }
+    }
+    //
+    // Software-tile tex_buf → back_tex.data (bypasses broken GX_DisplayTransfer)
+    tex_upload_software(&back_tex, (u32*)tex_buf, 512, 320, 200, 512);
 
-	DC_FlushRange (back_buffer, 256 * 192 * 2);
-	dmaCopyWords (2, back_buffer, front_buffer_top, 256 * 192);
-	dmaCopyWordsAsynch (2, back_buffer + (256 * 192), front_buffer_bottom, 256 * 192);
+    C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
 
-	while (GFX_STATUS & (1 << 27)); // wait till gfx engine is not busy
-	GFX_FLUSH = 2;
-//	while (GFX_STATUS & (1 << 27)); // wait till gfx engine is not busy
+    // Top screen: render the game as a fullscreen quad.
+    C3D_RenderTargetClear(target, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
+    C3D_FrameDrawOn(target);
+    C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLoc_projection, &projection);
+    C3D_TexBind(0, &back_tex);
+    C3D_DrawArrays(GPU_TRIANGLES, 0, quad_list_count);
 
-	// Clear the FIFO
-//	GFX_STATUS |= (1 << 29) | (1 << 15);
-	swiWaitForVBlank ();*/
-	//printf("Drawing bitblt\n");
-	
-	//back_buffer[100]=53;
-
-
-	// Convert 8-bit indexed back_buffer (320x200) to 3DS BGR8 framebuffer (400x240).
-	// The 3DS top screen is 400x240, stored column-major (each column top-to-bottom).
-	/*
-	extern ubyte gr_current_pal[];  // 256*3 bytes, RGB triplets, 6-bit (0-63)
-	u8* framebuffer = gfxGetFramebuffer(GFX_TOP, GFX_LEFT, NULL, NULL);
-	int x, y;
-	for (x = 0; x < 320; x++) {
-		for (y = 0; y < 200; y++) {
-			u8 idx = back_buffer[y * 320 + x];
-			u8 r = gr_current_pal[idx * 3 + 0] << 2;
-			u8 g = gr_current_pal[idx * 3 + 1] << 2;
-			u8 b = gr_current_pal[idx * 3 + 2] << 2;
-			// Column-major: pixel (x,y) is at offset x*240 + (239-y)
-			int dst = x * 240 + (239 - y);
-			framebuffer[dst * 3 + 0] = b;
-			framebuffer[dst * 3 + 1] = g;
-			framebuffer[dst * 3 + 2] = r;
-		}
-	}
-	*/
-
-	// Blit back_buffer (320x200, 8-bit indexed) to 3DS top screen (400x240, BGR8).
-	// Palette values are 6-bit (0-63); shift left 2 to get 8-bit (0-255).
-	// Centre the 320x200 image: 40px border left/right, 20px border top/bottom.
-	extern ubyte gr_current_pal[];
-	u8* framebuffer = gfxGetFramebuffer(GFX_TOP, GFX_LEFT, NULL, NULL);
-	int x, y;
-
-	// Clear screen to black first
-	for (x = 0; x < 400; x++) {
-		for (y = 0; y < 240; y++) {
-			int dst = x * 240 + (239 - y);
-			framebuffer[dst * 3 + 0] = 0;
-			framebuffer[dst * 3 + 1] = 0;
-			framebuffer[dst * 3 + 2] = 0;
-		}
-	}
-
-	// Blit palette-indexed back_buffer into the centred region
-	for (x = 0; x < 320; x++) {
-		for (y = 0; y < 200; y++) {
-			u8 idx = back_buffer[y * 320 + x];
-			u8 r = gr_current_pal[idx * 3 + 0] << 2;
-			u8 g = gr_current_pal[idx * 3 + 1] << 2;
-			u8 b = gr_current_pal[idx * 3 + 2] << 2;
-			int screen_x = x + 40;
-			int screen_y = y + 20;
-			int dst = screen_x * 240 + (239 - screen_y);
-			framebuffer[dst * 3 + 0] = b;
-			framebuffer[dst * 3 + 1] = g;
-			framebuffer[dst * 3 + 2] = r;
-		}
-	}
-
-	gfxFlushBuffers();
-    gfxSwapBuffers();
-    gspWaitForVBlank();
+    C3D_FrameEnd(0);
 }
 
 #ifdef WIFI_DEBUG
@@ -355,68 +341,68 @@ void Snd_ParseMessage (u32 msg);
 
 void init_3ds_gpu() 
 {
-	gfxSet3D(true); // Enable stereoscopic 3D
+	gfxSet3D(false); // 2D bitblt mode - no stereoscopic needed, and having it on without a right-eye target causes black screen
 	C3D_Init(C3D_DEFAULT_CMDBUF_SIZE);
 
-  target = C3D_RenderTargetCreate(240, 400, GPU_RB_RGBA8, GPU_RB_DEPTH24_STENCIL8);
+    target = C3D_RenderTargetCreate(240, 400, GPU_RB_RGBA8, GPU_RB_DEPTH24_STENCIL8);
+    C3D_RenderTargetSetOutput(target, GFX_TOP, GFX_LEFT, DISPLAY_TRANSFER_FLAGS);
 
-  sceneInit();
+    sceneInit();
 }
 
-void ds_start_frame() {
-  C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+// Frame begin/end are now owned by bitblt_to_screen.
+// These stubs remain for any existing call sites.
+void ds_start_frame() {}
+void ds_end_frame()   {}
 
-  C3D_RenderTargetClear(target, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
-  C3D_FrameDrawOn(target);
-
-	C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLoc_projection, &projection);
-
-	C3D_DrawArrays(GPU_TRIANGLES, 0, vertex_list_count);
-}
-
-void ds_end_frame() {
-  C3D_FrameEnd(0);
-}
-
-// From the 3ds examples
 void sceneInit(void)
 {
-	// Load the vertex shader, create a shader program and bind it
-	vshader_dvlb = DVLB_ParseFile((u32*)vshader_shbin, vshader_shbin_size);
-	shaderProgramInit(&program);
-	shaderProgramSetVsh(&program, &vshader_dvlb->DVLE[0]);
-	C3D_BindProgram(&program);
+    // Load shader and bind
+    vshader_dvlb = DVLB_ParseFile((u32*)vshader_shbin, vshader_shbin_size);
+    shaderProgramInit(&program);
+    shaderProgramSetVsh(&program, &vshader_dvlb->DVLE[0]);
+    C3D_BindProgram(&program);
 
-	// Get the location of the uniforms
-	uLoc_projection = shaderInstanceGetUniformLocation(program.vertexShader, "projection");
+    uLoc_projection = shaderInstanceGetUniformLocation(program.vertexShader, "projection");
 
-	// Configure attributes for use with the vertex shader
-	C3D_AttrInfo* attrInfo = C3D_GetAttrInfo();
-	AttrInfo_Init(attrInfo);
-	AttrInfo_AddLoader(attrInfo, 0, GPU_FLOAT, 3); // v0=position
-	AttrInfo_AddFixed(attrInfo, 1); // v1=color
+    // v0 = position (xyz), v1 = texcoord (uv)
+    C3D_AttrInfo* attrInfo = C3D_GetAttrInfo();
+    AttrInfo_Init(attrInfo);
+    AttrInfo_AddLoader(attrInfo, 0, GPU_FLOAT, 3); // v0=position
+    AttrInfo_AddLoader(attrInfo, 1, GPU_FLOAT, 2); // v1=texcoord
 
-	// Set the fixed attribute (color) to solid white
-	C3D_FixedAttribSet(1, 1.0, 1.0, 1.0, 1.0);
+    // Orthographic projection matching screen space (0-400 x, 0-240 y)
+    //Mtx_OrthoTilt(&projection, 0.0, 400.0, 0.0, 240.0, 0.0, 1.0, true);
+    Mtx_OrthoTilt(&projection, 0.0, 400.0, 240.0, 0.0, 0.0, 1.0, true);
 
-	// Compute the projection matrix
-	Mtx_OrthoTilt(&projection, 0.0, 400.0, 0.0, 240.0, 0.0, 1.0, true);
+    // Upload quad vertices to GPU-accessible memory
+    vbo_data = linearAlloc(sizeof(quad_list));
+    memcpy(vbo_data, quad_list, sizeof(quad_list));
 
-	// Create the VBO (vertex buffer object)
-	vbo_data = linearAlloc(sizeof(vertex_list));
-	memcpy(vbo_data, vertex_list, sizeof(vertex_list));
+    C3D_BufInfo* bufInfo = C3D_GetBufInfo();
+    BufInfo_Init(bufInfo);
+    BufInfo_Add(bufInfo, vbo_data, sizeof(vertex), 2, 0x10); // 2 attribs: v0, v1
 
-	// Configure buffers
-	C3D_BufInfo* bufInfo = C3D_GetBufInfo();
-	BufInfo_Init(bufInfo);
-	BufInfo_Add(bufInfo, vbo_data, sizeof(vertex), 1, 0x0);
+    // Allocate the GPU texture (512x256 RGBA8) and a linear staging buffer
+    C3D_TexInit(&back_tex, 512, 256, GPU_RGBA8);
+    C3D_TexSetFilter(&back_tex, GPU_LINEAR, GPU_LINEAR);
+    tex_buf = linearAlloc(512 * 256 * 4);
+    memset(tex_buf, 0, 512 * 256 * 4);
 
-	// Configure the first fragment shading substage to just pass through the vertex color
-	// See https://www.opengl.org/sdk/docs/man2/xhtml/glTexEnv.xml for more insight
-	C3D_TexEnv* env = C3D_GetTexEnv(0);
-	C3D_TexEnvInit(env);
-	C3D_TexEnvSrc(env, C3D_Both, GPU_PRIMARY_COLOR, 0, 0);
-	C3D_TexEnvFunc(env, C3D_Both, GPU_REPLACE);
+    // Disable face culling - winding order after OrthoTilt can be ambiguous
+    C3D_CullFace(GPU_CULL_NONE);
+
+    // Fragment stage: sample from texture unit 0
+    C3D_TexEnv* env = C3D_GetTexEnv(0);
+    C3D_TexEnvInit(env);
+    C3D_TexEnvSrc(env, C3D_Both, GPU_TEXTURE0, 0, 0);
+    C3D_TexEnvFunc(env, C3D_Both, GPU_REPLACE);
+
+    // C3D_TexEnv* env = C3D_GetTexEnv(0);
+    // C3D_TexEnvInit(env);
+    // C3D_TexEnvColor(env, 0xFF0000FF); // solid red RGBA
+    // C3D_TexEnvSrc(env, C3D_Both, GPU_CONSTANT, 0, 0);
+    // C3D_TexEnvFunc(env, C3D_Both, GPU_REPLACE);
 }
 
 ITCM_CODE void irq_arm9_fifo (void)
