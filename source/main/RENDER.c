@@ -2054,19 +2054,23 @@ done_list:
 //renders onto current canvas
 ITCM_CODE void render_mine(int start_seg_num,fix eye_offset)
 {
-	int		nn;
+    int		nn;
 
-	//	Initialize number of objects (actually, robots!) rendered this frame.
-	Num_rendered_objects = 0;
+    Num_rendered_objects = 0;
 
 #ifdef LASER_HACK
-	Hack_nlasers = 0;
+    Hack_nlasers = 0;
 #endif
 
-	#ifndef NDEBUG
-/*	for (i=0;i<=Highest_object_index;i++)
-		object_rendered[i] = 0;*/
-	#endif
+    #ifndef NDEBUG
+    {
+        int i;
+        for (i=0; i<=Highest_object_index; i++)
+            object_rendered[i] = 0;
+    }
+    #endif
+    
+    // ... rest of function ...
 
 	//set up for rendering
 

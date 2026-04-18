@@ -18,29 +18,14 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
  * 
  * Polygon object interpreter
  * 
- * $Log: interp.c $
- * Revision 1.4  1995/10/10  22:20:09  allender
- * new morphing code from Matt
- *
- * Revision 1.3  1995/08/31  15:40:24  allender
- * swap color data correctly
- *
- * Revision 1.2  1995/05/11  13:06:38  allender
- * fix int --> short problem
- *
- * Revision 1.1  1995/05/05  08:51:41  allender
- * Initial revision
- *
- * Revision 1.1  1995/04/17  06:44:33  matt
- * Initial revision
- * 
- * 
+ * 3DS port modification: model vertices come from the model file in
+ * object-local space. The original NDS port relied on hardware matrix-stack
+ * transform to convert these to camera space. The 3DS renderer expects
+ * camera-space vectors at g3_draw_tmap_tex / g3_draw_poly, so we transform
+ * here using View_position and View_matrix (which already incorporate any
+ * active g3_start_instance_matrix transform).
  */
-/*
-#pragma off (unreferenced)
-static char rcsid[] = "$Id: interp.c 1.4 1995/10/10 22:20:09 allender Exp $";
-#pragma on (unreferenced)
-*/
+
 #include <malloc.h>
 #include <string.h>
 
@@ -63,44 +48,43 @@ static char rcsid[] = "$Id: interp.c 1.4 1995/10/10 22:20:09 allender Exp $";
 #define OP_DEFP_START	7	//defpoints with start
 #define OP_GLOW			8	//glow value for next poly
 
-//#define N_OPCODES (sizeof(opcode_table) / sizeof(*opcode_table))
-
 #define MAX_POINTS_PER_POLY		25
 
-//short	highest_texture_num;
-//int	g3d_interp_outline;
-
-//g3s_point *Interp_point_list=robot_points;
-
-//#define MAX_INTERP_COLORS 100
-
-//this is a table of mappings from RGB15 to palette colors
-//struct {short pal_entry,rgb15;} interp_color_table[MAX_INTERP_COLORS];
-
-//int n_interp_colors=0;
-/*
-//gives the interpreter an array of points to use
-ITCM_CODE void g3_set_interp_points(g3s_point *pointlist)
-{
-	Interp_point_list = pointlist;
-}
-*/
 #define w(p)  (*((short *) (p)))
 #define wp(p)  ((short *) (p))
 #define vp(p)  ((vms_vector *) (p))
-/*
-void rotate_point_list(g3s_point *dest,vms_vector *src,int n)
-{
-	while (n--)
-		g3_rotate_point(dest++,src++);
-}
-*/
+
 vms_angvec zero_angles = {0,0,0};
 
 vms_vector  *list[1000];
 vms_vector	*point_list[MAX_POINTS_PER_POLY];
 
 int glow_num = -1;
+
+// -----------------------------------------------------------------------------
+// 3DS port: per-poly scratch buffer for object-space -> camera-space transform.
+//
+// Model vertices in the .pof model files are stored in object-local space.
+// The renderer downstream (g3_draw_tmap_tex, g3_draw_poly) expects camera-
+// space coordinates. We transform on the fly here using the same math
+// g3_rotate_point uses, since View_matrix and View_position already
+// incorporate any active g3_start_instance_matrix transform.
+// -----------------------------------------------------------------------------
+static vms_vector  Model_xformed_pts [MAX_POINTS_PER_POLY];
+static vms_vector* Model_xformed_ptrs[MAX_POINTS_PER_POLY];
+
+static inline void xform_model_pts(int nv, vms_vector** obj_pts)
+{
+	int i;
+	for (i = 0; i < nv; i++)
+	{
+		vms_vector tempv;
+		vm_vec_sub   (&tempv, obj_pts[i], &View_position);
+		vm_vec_rotate(&Model_xformed_pts[i], &tempv, &View_matrix);
+		Model_xformed_ptrs[i] = &Model_xformed_pts[i];
+	}
+}
+
 //calls the object interpreter to render an object.  The object renderer
 //is really a seperate pipeline. returns true if drew
 ITCM_CODE bool g3_draw_polygon_model(void *model_ptr,grs_bitmap **model_bitmaps,vms_angvec *anim_angles,fix model_light,fix *glow_values)
@@ -124,10 +108,6 @@ ITCM_CODE bool g3_draw_polygon_model(void *model_ptr,grs_bitmap **model_bitmaps,
 					*l++ = vp(p);
 					p += 12;
 				}
-
-//				rotate_point_list(Interp_point_list,vp(p+4),n);
-
-//				p += n*sizeof(struct vms_vector) + 4;
 				break;
 			}
 
@@ -143,10 +123,6 @@ ITCM_CODE bool g3_draw_polygon_model(void *model_ptr,grs_bitmap **model_bitmaps,
 					*l++ = vp(p);
 					p += 12;
 				}
-
-//				rotate_point_list(&Interp_point_list[s],vp(p+8),n);
-
-//				p += n*sizeof(struct vms_vector) + 8;
 				break;
 			}
 
@@ -161,7 +137,9 @@ ITCM_CODE bool g3_draw_polygon_model(void *model_ptr,grs_bitmap **model_bitmaps,
 				for (i=0;i<nv;i++)
 					point_list[i] = list[wp(p+30)[i]];
 
-				g3_draw_poly(nv,point_list);
+				// 3DS port: transform object-space verts to camera space
+				xform_model_pts(nv, point_list);
+				g3_draw_poly(nv, Model_xformed_ptrs);
 
 				p += 30 + ((nv&~1)+1)*2;
 				break;
@@ -195,7 +173,21 @@ ITCM_CODE bool g3_draw_polygon_model(void *model_ptr,grs_bitmap **model_bitmaps,
 					uvl_list[i].l = light;
 				}
 
-				g3_draw_tmap_func(nv,point_list,uvl_list,model_bitmaps[w(p+28)]);
+				// 3DS port: transform object-space verts to camera space
+				xform_model_pts(nv, point_list);
+        // In OP_TMAPPOLY case, right before the g3_draw_tmap_func call:
+        {
+            static int dbg = 0;
+            if (dbg < 10) {
+                printf("model poly: nv=%d v0=(%ld,%ld,%ld)\n", nv,
+                    (long)Model_xformed_pts[0].x,
+                    (long)Model_xformed_pts[0].y,
+                    (long)Model_xformed_pts[0].z);
+                dbg++;
+            }
+        }
+				g3_draw_tmap_func(nv, Model_xformed_ptrs, uvl_list,
+				                  model_bitmaps[w(p+28)]);
 
 				p += 30 + ((nv&~1)+1)*2 + nv*12;
 				break;
@@ -210,13 +202,10 @@ ITCM_CODE bool g3_draw_polygon_model(void *model_ptr,grs_bitmap **model_bitmaps,
 
 
 			case OP_RODBM: {
-//				g3s_point rod_bot_p,rod_top_p;
-
-//				g3_rotate_point(&rod_bot_p,vp(p+20));
-//				g3_rotate_point(&rod_top_p,vp(p+4));
-//				rod_bot_p.p3_vec = *;
-//				rod_top_p.p3_vec = *vp(p+4);
-
+				// NOTE: rods (laser bolts, energy beams) still pass raw
+				// object-space vectors. g3_draw_rod_tmap is a separate
+				// codepath we haven't audited yet. If rods render in the
+				// wrong place, this is the spot to fix.
 				g3_draw_rod_tmap(model_bitmaps[w(p+2)],vp(p+4),w(p+16),vp(p+20),w(p+32),f1_0);
 
 				p+=36;
@@ -253,13 +242,9 @@ ITCM_CODE bool g3_draw_polygon_model(void *model_ptr,grs_bitmap **model_bitmaps,
 	return 1;
 }
 
-//extern int gr_find_closest_color_15bpp( int rgb );
-
 #ifndef NDEBUG
 int nest_count;
 #endif
-
-//#pragma off (unreferenced)
 
 //alternate interpreter for morphing object
 ITCM_CODE bool g3_draw_morphing_model(void *model_ptr,grs_bitmap **model_bitmaps,vms_angvec *anim_angles,fix model_light,vms_vector *new_points)
@@ -282,8 +267,6 @@ ITCM_CODE bool g3_draw_morphing_model(void *model_ptr,grs_bitmap **model_bitmaps
 				for (i=0; i<n; i++)
 					*l++ = &new_points[i];
 
-//				rotate_point_list(Interp_point_list,new_points,n);
-
 				p += n*sizeof(struct vms_vector) + 4;
 				break;
 			}
@@ -296,8 +279,6 @@ ITCM_CODE bool g3_draw_morphing_model(void *model_ptr,grs_bitmap **model_bitmaps
 
 				for (i=0; i<n; i++)
 					*l++ = &new_points[i];
-
-//				rotate_point_list(&Interp_point_list[s],new_points,n);
 
 				p += n*sizeof (struct vms_vector) + 8;
 				break;
@@ -315,7 +296,11 @@ ITCM_CODE bool g3_draw_morphing_model(void *model_ptr,grs_bitmap **model_bitmaps
 				for (ntris=nv-2;ntris;ntris--) {
 					point_list[2] = list[wp(p+30)[i++]];
 
-					g3_draw_poly(3,point_list);
+					// 3DS port: transform object-space verts to camera space.
+					// Each tri gets its own transform pass since point_list
+					// changes between iterations.
+					xform_model_pts(3, point_list);
+					g3_draw_poly(3, Model_xformed_ptrs);
 
 					point_list[1] = point_list[2];
 				}
@@ -363,7 +348,13 @@ ITCM_CODE bool g3_draw_morphing_model(void *model_ptr,grs_bitmap **model_bitmaps
 					morph_uvls[2].v = uvl_list[i].v;
 					i++;
 
-					g3_draw_tmap_tex(3,point_list,uvl_list,model_bitmaps[w(p+28)]);
+					// 3DS port: transform object-space verts to camera space.
+					// NOTE: original called g3_draw_tmap_tex with uvl_list,
+					// but morph_uvls was computed and unused - looks like a
+					// pre-existing bug. Preserving original behavior.
+					xform_model_pts(3, point_list);
+					g3_draw_tmap_tex(3, Model_xformed_ptrs, uvl_list,
+					                 model_bitmaps[w(p+28)]);
 
 					point_list[1] = point_list[2];
 					morph_uvls[1].u = morph_uvls[2].u;
@@ -383,12 +374,7 @@ ITCM_CODE bool g3_draw_morphing_model(void *model_ptr,grs_bitmap **model_bitmaps
 
 
 			case OP_RODBM: {
-//				g3s_point rod_bot_p,rod_top_p;
-
-//				rod_bot_p.p3_vec = *vp(p+20);
-//				rod_top_p.p3_vec = *vp(p+4);
-
-//				g3_draw_rod_tmap(model_bitmaps[w(p+2)],&rod_bot_p,w(p+16),&rod_top_p,w(p+32),f1_0);
+				// See note in g3_draw_polygon_model about rods.
 				g3_draw_rod_tmap(model_bitmaps[w(p+2)],vp(p+4),w(p+16),vp(p+20),w(p+32),f1_0);
 
 				p+=36;
@@ -423,92 +409,7 @@ ITCM_CODE bool g3_draw_morphing_model(void *model_ptr,grs_bitmap **model_bitmaps
 	}
 	return 1;
 }
-/*
-void init_model_sub(ubyte *p)
-{
-	Assert(++nest_count < 1000);
 
-	while (w(p) != OP_EOF) {
-
-		switch (w(p)) {
-
-			case OP_DEFPOINTS: {
-				int n = w(p+2);
-				p += n*sizeof(struct vms_vector) + 4;
-				break;
-			}
-
-			case OP_DEFP_START: {
-				int n = w(p+2);
-				p += n*sizeof(struct vms_vector) + 8;
-				break;
-			}
-
-			case OP_FLATPOLY: {
-				int nv = w(p+2);
-
-				Assert(nv > 2);		//must have 3 or more points
-
-				*wp(p+28) = (short)gr_find_closest_color_15bpp(w(p+28));
-
-				p += 30 + ((nv&~1)+1)*2;
-					
-				break;
-			}
-
-			case OP_TMAPPOLY: {
-				int nv = w(p+2);
-
-				Assert(nv > 2);		//must have 3 or more points
-
-				if (w(p+28) > highest_texture_num)
-					highest_texture_num = w(p+28);
-
-				p += 30 + ((nv&~1)+1)*2 + nv*12;
-					
-				break;
-			}
-
-			case OP_SORTNORM:
-
-				init_model_sub(p+w(p+28));
-				init_model_sub(p+w(p+30));
-				p += 32;
-
-				break;
-
-
-			case OP_RODBM:
-				p += 36;
-				break;
-
-
-			case OP_SUBCALL: {
-				init_model_sub(p+w(p+16));
-				p += 20;
-				break;
-
-			}
-
-			case OP_GLOW:
-				p += 4;
-				break;
-		}
-	}
-}
-
-//init code for bitmap models
-void g3_init_polygon_model(void *model_ptr)
-{
-	#ifndef NDEBUG
-	nest_count = 0;
-	#endif
-
-	highest_texture_num = -1;
-
-	init_model_sub((ubyte *) model_ptr);
-}
-*/
 int		*refs, num_refs;
 int		*refs_ptr;
 int		*eofs, num_eofs;
