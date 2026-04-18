@@ -79,7 +79,8 @@ bool        doSleep;
 // -----------------------------------------------------------------------------
 // GPU state (bitblt)
 // -----------------------------------------------------------------------------
-static C3D_RenderTarget* target;
+static C3D_RenderTarget* target_left;
+static C3D_RenderTarget* target_right;
 static DVLB_s*           vshader_dvlb;
 static shaderProgram_s   program;
 static int               uLoc_projection;
@@ -668,53 +669,6 @@ static void world_init(void)
     // approach stays as-is.
     Mtx_OrthoTilt(&world_projection, 0.0f, SCREEN_W, SCREEN_H, 0.0f,
                   -1.0f, 1.0f, true);
-#else
-    // TEXTURED mode: real perspective projection on the GPU. Camera-space
-    // vertices come in, the GPU divides by w to project AND interpolates
-    // texcoords perspective-correctly (which is the whole point of moving
-    // projection to the GPU).
-    //
-    // We build the matrix to:
-    //   1. Apply perspective projection with our FOV
-    //   2. Flip Y so +Y up in Descent maps to screen +Y up (PICA200 NDC has +Y up)
-    //   3. Flip Z direction (Descent +Z forward, PICA200 wants -Z forward)
-    //   4. Apply the 3DS's 90-degree screen rotation (tilt)
-    //   5. Map the NDC output to the QUAD region instead of full screen
-    //
-    // We use Mtx_PerspTilt for steps 1, 3, 4 but pass an "effective aspect"
-    // computed from our explicit horizontal/vertical FOVs rather than the
-    // physical screen aspect. That way the matrix produces the H/V FOV
-    // combination we asked for, even if it doesn't match the screen aspect.
-    float fov_v_rad   = WIRE_FOV_V_DEG * (float)M_PI / 180.0f;
-    float fov_h_rad   = WIRE_FOV_H_DEG * (float)M_PI / 180.0f;
-    // For perspective projection: tan(fov_h/2) = aspect * tan(fov_v/2)
-    // So the aspect we feed to Mtx_PerspTilt is the FOV ratio, not screen ratio.
-    float effective_aspect = tanf(fov_h_rad * 0.5f) / tanf(fov_v_rad * 0.5f);
-    Mtx_PerspTilt(&world_projection, fov_v_rad, effective_aspect,
-                  WIRE_NEAR, WIRE_FAR, true);  // true = left-handed (+Z forward, matches Descent)
-
-    // Post-multiply by a scale+translate to squash output into the quad
-    // region. NDC is [-1, 1]; we want the quad's screen footprint.
-    // Scale factor: quad_width / screen_width on each axis.
-    // Translate: shift center of NDC to center of quad in NDC.
-    float quad_cx_ndc = ((QUAD_X0 + QUAD_X1) * 0.5f - SCREEN_W * 0.5f) / (SCREEN_W * 0.5f);
-    float quad_cy_ndc = ((QUAD_Y0 + QUAD_Y1) * 0.5f - SCREEN_H * 0.5f) / (SCREEN_H * 0.5f);
-    float quad_sx     = (QUAD_X1 - QUAD_X0) / (float)SCREEN_W;
-    float quad_sy     = (QUAD_Y1 - QUAD_Y0) / (float)SCREEN_H;
-
-    // Build viewport remap matrix: out = scale * in + translate (per axis).
-    // Because of OrthoTilt-style rotation, X and Y are swapped in the
-    // post-tilt coordinate system. The remap is applied in pre-tilt space.
-    C3D_Mtx remap;
-    Mtx_Identity(&remap);
-    remap.r[0].x = quad_sx;
-    remap.r[1].y = quad_sy;
-    remap.r[0].w = quad_cx_ndc;
-    remap.r[1].w = quad_cy_ndc;
-
-    C3D_Mtx tmp;
-    Mtx_Multiply(&tmp, &remap, &world_projection);
-    world_projection = tmp;
 #endif
 
 #if WORLD_MODE == WORLD_MODE_WIREFRAME
@@ -796,17 +750,94 @@ static inline void world_emit_vert(float x, float y, float z, float u, float v)
 }
 #endif
 
+#if WORLD_MODE == WORLD_MODE_TEXTURED
+// Build the world-space perspective projection matrix for a given eye IOD.
+// iod=0 builds a mono (no offset) matrix. Negative iod = left eye, positive
+// = right eye. Result is stored in world_projection (consumed by
+// world_setup_state via C3D_FVUnifMtx4x4).
+//
+// The full matrix is: viewport_remap * camera_x_translate * perspective_tilt
+// where camera_x_translate shifts the camera horizontally in camera-space
+// to produce stereo parallax. This is equivalent to (but more controllable
+// than) Mtx_PerspStereoTilt — and avoids potential ordering issues with
+// the post-tilt viewport-remap matrix.
+//
+// stereo_screen_dist controls the convergence plane — objects at this
+// camera-space distance appear AT screen depth. Closer objects pop out
+// (toward viewer), farther objects recede behind the screen. Tuned for
+// Descent's typical 5-30 unit room scale.
+static const float stereo_screen_dist = 8.0f;
+
+static void world_build_projection(float iod)
+{
+    float fov_v_rad = WIRE_FOV_V_DEG * (float)M_PI / 180.0f;
+    float fov_h_rad = WIRE_FOV_H_DEG * (float)M_PI / 180.0f;
+    float effective_aspect = tanf(fov_h_rad * 0.5f) / tanf(fov_v_rad * 0.5f);
+
+    // Standard perspective+tilt — same for both eyes.
+    Mtx_PerspTilt(&world_projection, fov_v_rad, effective_aspect,
+                  WIRE_NEAR, WIRE_FAR, true);
+
+    // Apply stereo by translating the camera horizontally and shearing.
+    // We shear X by -iod * (Z - screen_dist) / screen_dist so that:
+    //   - At Z = screen_dist: no shift (convergence plane is at screen depth)
+    //   - Far objects: shifted in one direction
+    //   - Near objects: shifted in opposite direction
+    // This is what PerspStereoTilt does internally, but applied in
+    // camera-space pre-perspective — avoiding any post-tilt ordering issues.
+    if (iod != 0.0f) {
+        C3D_Mtx shear;
+        Mtx_Identity(&shear);
+        // shear X by Z: X_new = X + (iod / screen_dist) * Z - iod
+        // In matrix form (column vector): row 0: [1, 0, iod/screen_dist, -iod]
+        shear.r[0].z = iod / stereo_screen_dist;
+        shear.r[0].w = -iod;
+
+        C3D_Mtx tmp;
+        Mtx_Multiply(&tmp, &world_projection, &shear);
+        world_projection = tmp;
+    }
+
+    // Post-multiply by viewport-remap to confine output to the QUAD region.
+    float quad_cx_ndc = ((QUAD_X0 + QUAD_X1) * 0.5f - SCREEN_W * 0.5f) / (SCREEN_W * 0.5f);
+    float quad_cy_ndc = ((QUAD_Y0 + QUAD_Y1) * 0.5f - SCREEN_H * 0.5f) / (SCREEN_H * 0.5f);
+    float quad_sx     = (QUAD_X1 - QUAD_X0) / (float)SCREEN_W;
+    float quad_sy     = (QUAD_Y1 - QUAD_Y0) / (float)SCREEN_H;
+
+    C3D_Mtx remap;
+    Mtx_Identity(&remap);
+    remap.r[0].x = quad_sx;
+    remap.r[1].y = quad_sy;
+    remap.r[0].w = quad_cx_ndc;
+    remap.r[1].w = quad_cy_ndc;
+
+    C3D_Mtx tmp;
+    Mtx_Multiply(&tmp, &remap, &world_projection);
+    world_projection = tmp;
+}
+#endif
+
 static void world_frame_begin(void)
 {
+    // Wait for GPU to finish processing the previous frame's draws BEFORE
+    // we start overwriting world_vbo. Without this:
+    //   1. We submit draws referencing world_vbo at frame N
+    //   2. C3D_FrameEnd returns immediately (GPU still processing)
+    //   3. Descent's render walk happens, OVERWRITES world_vbo for frame N+1
+    //   4. GPU is still reading frame N's data — now corrupted
+    // The race is much wider in stereo because right-eye draws are submitted
+    // later, leaving more pending GPU work to overlap with CPU writes.
+    // SYNCDRAW at FrameBegin handles this for state set there, but world_vbo
+    // gets written by Descent BEFORE FrameBegin, so it's outside that wait.
+    gspWaitForP3D();
+
     world_vbo_count = 0;
 #if WORLD_MODE == WORLD_MODE_TEXTURED
     world_batch_count = 0;
     world_last_tex = NULL;
 
     // Free any GPU textures orphaned during the PREVIOUS frame.
-    // Safe here: bitblt_to_screen already called C3D_FrameEnd, and the
-    // next C3D_FrameBegin(SYNCDRAW) will block until GPU completion before
-    // we issue any new draws referencing fresh textures.
+    // Safe here: gspWaitForP3D above guaranteed GPU completion.
     for (int i = 0; i < orphan_slot_count; i++) {
         gpu_tex_free_slot(orphan_slots[i]);
     }
@@ -1185,10 +1216,19 @@ void bitblt_to_screen(void)
     keyboard_handler();
 
     C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
-    C3D_RenderTargetClear(target, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
-    C3D_FrameDrawOn(target);
+
+    C3D_RenderTargetClear(target_left, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
+    C3D_FrameDrawOn(target_left);
     C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLoc_projection, &projection);
     C3D_DrawArrays(GPU_TRIANGLES, 0, triangle_vert_count);
+
+    if (osGet3DSliderState() > 0.0f) {
+        C3D_RenderTargetClear(target_right, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
+        C3D_FrameDrawOn(target_right);
+        C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLoc_projection, &projection);
+        C3D_DrawArrays(GPU_TRIANGLES, 0, triangle_vert_count);
+    }
+
     C3D_FrameEnd(0);
 }
 
@@ -1276,6 +1316,38 @@ void sceneInit(void)
     C3D_TexEnvFunc(env, C3D_Both, GPU_REPLACE);
 }
 
+// Draws one eye's worth of screen contents: the bitblt quad (HUD/menus
+// from software framebuffer) plus the world geometry on top. Called once
+// for mono, twice (left + right) for stereo. Caller is responsible for
+// FrameDrawOn(target) and (for world mode) building world_projection
+// before calling.
+//
+// Note: world_frame_end is called once per eye, but it only ISSUES
+// draw commands. The world VBO and batch list are populated once per
+// game frame and reused across both eyes. That's the whole win of
+// stereo done this way: vertex transform happens once on CPU, GPU
+// draws twice with different projection matrices.
+static void draw_screen_contents(void)
+{
+    C3D_BindProgram(&program);
+    C3D_AttrInfo* attrInfo = C3D_GetAttrInfo();
+    AttrInfo_Init(attrInfo);
+    AttrInfo_AddLoader(attrInfo, 0, GPU_FLOAT, 3);
+    AttrInfo_AddLoader(attrInfo, 1, GPU_FLOAT, 2);
+    C3D_BufInfo* bufInfo = C3D_GetBufInfo();
+    BufInfo_Init(bufInfo);
+    BufInfo_Add(bufInfo, vbo_data, sizeof(tex_vertex), 2, 0x10);
+    C3D_TexEnv* env = C3D_GetTexEnv(0);
+    C3D_TexEnvInit(env);
+    C3D_TexEnvSrc(env, C3D_Both, GPU_TEXTURE0, 0, 0);
+    C3D_TexEnvFunc(env, C3D_Both, GPU_REPLACE);
+    C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLoc_projection, &projection);
+    C3D_TexBind(0, &back_tex);
+    C3D_DrawArrays(GPU_TRIANGLES, 0, quad_list_count);
+
+    world_frame_end();
+}
+
 void bitblt_to_screen(void)
 {
     hidScanInput();
@@ -1316,29 +1388,44 @@ void bitblt_to_screen(void)
     tex_upload_software(&back_tex, (u32*)tex_buf, TEX_W, GAME_W, UPLOAD_H, TEX_W);
 #endif
 
+    // ----- Stereo 3D support -----
+    // The 3D slider on the console returns 0.0 (off) to 1.0 (max). We map
+    // it to an interocular distance (IOD). The /3 divisor matches the
+    // citro3d sample's "tame the effect" tweak — full slider produces a
+    // comfortable depth feel without too much eye strain.
+    float slider = osGet3DSliderState();
+    float iod = slider / 3.0f;
+    bool stereo = (iod > 0.0f);
+
+    // Flush world_vbo from CPU cache so GPU reads the freshly-written data.
+    // Without this, GPU may sample stale cache lines, producing geometry
+    // that doesn't match what we wrote — most visible in stereo where
+    // the right eye's draws come after the left's and timing differences
+    // can expose the cache coherency issue. Mono mode mostly worked by
+    // luck (citro3d's frame-begin path happened to flush enough).
+    if (world_vbo_count > 0) {
+        GSPGPU_FlushDataCache(world_vbo, sizeof(world_vertex) * world_vbo_count);
+    }
+
     C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
-    C3D_RenderTargetClear(target, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
-    C3D_FrameDrawOn(target);
 
-    // Draw the bitblt quad (background)
-    C3D_BindProgram(&program);
-    C3D_AttrInfo* attrInfo = C3D_GetAttrInfo();
-    AttrInfo_Init(attrInfo);
-    AttrInfo_AddLoader(attrInfo, 0, GPU_FLOAT, 3);
-    AttrInfo_AddLoader(attrInfo, 1, GPU_FLOAT, 2);
-    C3D_BufInfo* bufInfo = C3D_GetBufInfo();
-    BufInfo_Init(bufInfo);
-    BufInfo_Add(bufInfo, vbo_data, sizeof(tex_vertex), 2, 0x10);
-    C3D_TexEnv* env = C3D_GetTexEnv(0);
-    C3D_TexEnvInit(env);
-    C3D_TexEnvSrc(env, C3D_Both, GPU_TEXTURE0, 0, 0);
-    C3D_TexEnvFunc(env, C3D_Both, GPU_REPLACE);
-    C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLoc_projection, &projection);
-    C3D_TexBind(0, &back_tex);
-    C3D_DrawArrays(GPU_TRIANGLES, 0, quad_list_count);
+    // ----- Left eye (always drawn) -----
+    C3D_RenderTargetClear(target_left, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
+    C3D_FrameDrawOn(target_left);
+#if WORLD_MODE == WORLD_MODE_TEXTURED
+    world_build_projection(stereo ? -iod : 0.0f);  // negative iod = left eye
+#endif
+    draw_screen_contents();
 
-    // Draw world geometry on top (textured polys or wireframes)
-    world_frame_end();
+    // ----- Right eye (only if slider engaged) -----
+    if (stereo) {
+        C3D_RenderTargetClear(target_right, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
+        C3D_FrameDrawOn(target_right);
+#if WORLD_MODE == WORLD_MODE_TEXTURED
+        world_build_projection(iod);  // positive iod = right eye
+#endif
+        draw_screen_contents();
+    }
 
     C3D_FrameEnd(0);
 
@@ -1353,12 +1440,18 @@ void bitblt_to_screen(void)
 // =============================================================================
 void init_3ds_gpu(void)
 {
-    gfxSet3D(false);
+    gfxSet3D(true);   // enable stereoscopic 3D — used when slider > 0
     C3D_Init(C3D_DEFAULT_CMDBUF_SIZE);
 
-    target = C3D_RenderTargetCreate(SCREEN_H, SCREEN_W,
-                                    GPU_RB_RGBA8, GPU_RB_DEPTH24_STENCIL8);
-    C3D_RenderTargetSetOutput(target, GFX_TOP, GFX_LEFT, DISPLAY_TRANSFER_FLAGS);
+    // Two render targets so we can draw left + right eye separately.
+    // When the 3D slider is at 0, only target_left is drawn (mono mode).
+    target_left = C3D_RenderTargetCreate(SCREEN_H, SCREEN_W,
+                                         GPU_RB_RGBA8, GPU_RB_DEPTH24_STENCIL8);
+    C3D_RenderTargetSetOutput(target_left, GFX_TOP, GFX_LEFT, DISPLAY_TRANSFER_FLAGS);
+
+    target_right = C3D_RenderTargetCreate(SCREEN_H, SCREEN_W,
+                                          GPU_RB_RGBA8, GPU_RB_DEPTH24_STENCIL8);
+    C3D_RenderTargetSetOutput(target_right, GFX_TOP, GFX_RIGHT, DISPLAY_TRANSFER_FLAGS);
 
     sceneInit();
     world_init();
