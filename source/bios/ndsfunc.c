@@ -579,8 +579,22 @@ bool gpu_inited = false;
 // init/draw lifecycle. They differ in vertex format and shader.
 // =============================================================================
 
-// Vertical field of view in degrees
-#define WIRE_FOV_DEG      60.0f
+// Descent's original display was 320x200 stretched to a 4:3 CRT, giving
+// taller-than-wide pixels. The game's "standard" FOV is roughly 90 degrees
+// horizontal across 4:3, which works out to about 73.7 degrees vertical
+// (since tan(73.7/2) = tan(90/2) * (3/4) when accounting for aspect).
+//
+// On the 3DS we render to a quad that's roughly 4:3, but pixels are square.
+// To preserve Descent's feel — wide horizontally, less vertically — we
+// override the horizontal FOV explicitly rather than computing it from
+// vertical FOV * aspect.
+//
+// You can tune these to taste. Typical values:
+//   - 90 horizontal / 75 vertical: Descent original
+//   - 95 horizontal / 75 vertical: feels slightly wider, more modern
+//   - 75 horizontal / 60 vertical: zoomed-in, "telephoto" look
+#define WIRE_FOV_H_DEG    56.0f   // horizontal FOV
+#define WIRE_FOV_V_DEG    60.0f   // vertical FOV
 
 // Near/far clip planes in Descent units (F1_0 = 65536 = 1 unit)
 #define WIRE_NEAR         0.1f
@@ -667,11 +681,16 @@ static void world_init(void)
     //   4. Apply the 3DS's 90-degree screen rotation (tilt)
     //   5. Map the NDC output to the QUAD region instead of full screen
     //
-    // citro3d's Mtx_PerspTilt does steps 1, 3, 4 for a full-screen quad.
-    // We then need step 5: post-scale to confine output to the quad region.
-    float fov_rad = WIRE_FOV_DEG * (float)M_PI / 180.0f;
-    float aspect  = (float)(QUAD_X1 - QUAD_X0) / (float)(QUAD_Y1 - QUAD_Y0);
-    Mtx_PerspTilt(&world_projection, fov_rad, aspect,
+    // We use Mtx_PerspTilt for steps 1, 3, 4 but pass an "effective aspect"
+    // computed from our explicit horizontal/vertical FOVs rather than the
+    // physical screen aspect. That way the matrix produces the H/V FOV
+    // combination we asked for, even if it doesn't match the screen aspect.
+    float fov_v_rad   = WIRE_FOV_V_DEG * (float)M_PI / 180.0f;
+    float fov_h_rad   = WIRE_FOV_H_DEG * (float)M_PI / 180.0f;
+    // For perspective projection: tan(fov_h/2) = aspect * tan(fov_v/2)
+    // So the aspect we feed to Mtx_PerspTilt is the FOV ratio, not screen ratio.
+    float effective_aspect = tanf(fov_h_rad * 0.5f) / tanf(fov_v_rad * 0.5f);
+    Mtx_PerspTilt(&world_projection, fov_v_rad, effective_aspect,
                   WIRE_NEAR, WIRE_FAR, true);  // true = left-handed (+Z forward, matches Descent)
 
     // Post-multiply by a scale+translate to squash output into the quad
@@ -700,8 +719,9 @@ static void world_init(void)
 
 #if WORLD_MODE == WORLD_MODE_WIREFRAME
     // Precompute focal length and viewport mapping (wireframe only — uses
-    // CPU-side projection in world_project)
-    float fov_rad = WIRE_FOV_DEG * (float)M_PI / 180.0f;
+    // CPU-side projection in world_project). Uses vertical FOV; horizontal
+    // is implicitly derived via aspect ratio.
+    float fov_rad = WIRE_FOV_V_DEG * (float)M_PI / 180.0f;
     world_focal      = 1.0f / tanf(fov_rad * 0.5f);
     world_aspect_inv = (float)GAME_H / (float)GAME_W;
 
