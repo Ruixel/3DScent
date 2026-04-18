@@ -1,10 +1,13 @@
 ; Vertex shader for textured world geometry
-; Input:  v0 = position (xyz, in 3DS screen space - we project on CPU)
+; Input:  v0 = position (xyz, in DESCENT CAMERA SPACE - left-handed, +Z forward)
 ;         v1 = texcoord (uv)
-; Output: clip-space position, texcoord passed through
+; Output: clip-space position with proper W (so GPU does perspective-correct
+;         attribute interpolation), texcoord passed through.
 ;
-; Style matches the working texcoord shader: explicit .entry, .in declarations.
-; PICA200 hardware is strict about these.
+; The projection uniform is a perspective matrix configured by C code, which
+; transforms camera-space (+Z forward, +Y up, left-handed) directly to PICA200
+; clip space (with the extra rotation OrthoTilt-style for the 3DS's rotated
+; framebuffer).
 
 ; Uniforms
 .fvec projection[4]
@@ -24,11 +27,14 @@
 
 .entry vmain
 .proc vmain
-    ; Build vec4 from xyz position
+    ; Build vec4 from xyz position (w=1 for perspective transform)
     mov r0.xyz, inpos
     mov r0.w,   ones
 
-    ; outpos = projection * r0
+    ; outpos = projection * r0 — produces (x*w, y*w, z*w, w) in clip space.
+    ; The PICA200 will then do perspective divide (xyz/w) and viewport
+    ; transform automatically. Because w is preserved, attribute interpolation
+    ; (the texcoord) is perspective-correct.
     dp4 outpos.x, projection[0], r0
     dp4 outpos.y, projection[1], r0
     dp4 outpos.z, projection[2], r0

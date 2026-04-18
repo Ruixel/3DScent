@@ -443,13 +443,58 @@ static void world_init(void)
     world_uLoc_color = shaderInstanceGetUniformLocation(world_program.vertexShader, "wireColor");
 #endif
 
-    // GPU-side projection is ortho in 3DS screen space. We do perspective on
-    // the CPU (in world_project) and emit screen coords directly.
+#if WORLD_MODE == WORLD_MODE_WIREFRAME
+    // Wireframe still uses CPU-side projection + screen-space ortho on GPU.
+    // The line-quad extrusion math operates in screen space, so this
+    // approach stays as-is.
     Mtx_OrthoTilt(&world_projection, 0.0f, SCREEN_W, SCREEN_H, 0.0f,
                   -1.0f, 1.0f, true);
-
-    // Precompute focal length and viewport mapping
+#else
+    // TEXTURED mode: real perspective projection on the GPU. Camera-space
+    // vertices come in, the GPU divides by w to project AND interpolates
+    // texcoords perspective-correctly (which is the whole point of moving
+    // projection to the GPU).
+    //
+    // We build the matrix to:
+    //   1. Apply perspective projection with our FOV
+    //   2. Flip Y so +Y up in Descent maps to screen +Y up (PICA200 NDC has +Y up)
+    //   3. Flip Z direction (Descent +Z forward, PICA200 wants -Z forward)
+    //   4. Apply the 3DS's 90-degree screen rotation (tilt)
+    //   5. Map the NDC output to the QUAD region instead of full screen
+    //
+    // citro3d's Mtx_PerspTilt does steps 1, 3, 4 for a full-screen quad.
+    // We then need step 5: post-scale to confine output to the quad region.
     float fov_rad = WIRE_FOV_DEG * (float)M_PI / 180.0f;
+    float aspect  = (float)(QUAD_X1 - QUAD_X0) / (float)(QUAD_Y1 - QUAD_Y0);
+    Mtx_PerspTilt(&world_projection, fov_rad, aspect,
+                  WIRE_NEAR, WIRE_FAR, true);  // true = left-handed (+Z forward, matches Descent)
+
+    // Post-multiply by a scale+translate to squash output into the quad
+    // region. NDC is [-1, 1]; we want the quad's screen footprint.
+    // Scale factor: quad_width / screen_width on each axis.
+    // Translate: shift center of NDC to center of quad in NDC.
+    float quad_cx_ndc = ((QUAD_X0 + QUAD_X1) * 0.5f - SCREEN_W * 0.5f) / (SCREEN_W * 0.5f);
+    float quad_cy_ndc = ((QUAD_Y0 + QUAD_Y1) * 0.5f - SCREEN_H * 0.5f) / (SCREEN_H * 0.5f);
+    float quad_sx     = (QUAD_X1 - QUAD_X0) / (float)SCREEN_W;
+    float quad_sy     = (QUAD_Y1 - QUAD_Y0) / (float)SCREEN_H;
+
+    // Build viewport remap matrix: out = scale * in + translate (per axis).
+    // Because of OrthoTilt-style rotation, X and Y are swapped in the
+    // post-tilt coordinate system. The remap is applied in pre-tilt space.
+    C3D_Mtx remap;
+    Mtx_Identity(&remap);
+    remap.r[0].x = quad_sx;
+    remap.r[1].y = quad_sy;
+    remap.r[0].w = quad_cx_ndc;
+    remap.r[1].w = quad_cy_ndc;
+
+    C3D_Mtx tmp;
+    Mtx_Multiply(&tmp, &remap, &world_projection);
+    world_projection = tmp;
+#endif
+
+    // Precompute focal length and viewport mapping (wireframe only)
+    //float fov_rad = WIRE_FOV_DEG * (float)M_PI / 180.0f;
     world_focal      = 1.0f / tanf(fov_rad * 0.5f);
     world_aspect_inv = (float)GAME_H / (float)GAME_W;
 
@@ -512,12 +557,13 @@ static void world_emit_line(float x0, float y0, float x1, float y1)
 #else
 // -----------------------------------------------------------------------------
 // Textured vertex emission — fan-triangulated polygon with UVs
+// Now takes camera-space 3D position; the GPU vertex shader projects.
 // -----------------------------------------------------------------------------
-static inline void world_emit_vert(float x, float y, float u, float v)
+static inline void world_emit_vert(float x, float y, float z, float u, float v)
 {
     if (world_vbo_count >= WIRE_MAX_VERTS) return;
     world_vertex* p = &world_vbo[world_vbo_count++];
-    p->x = x; p->y = y; p->z = 0.0f;
+    p->x = x; p->y = y; p->z = z;
     p->u = u; p->v = v;
 }
 #endif
@@ -652,15 +698,17 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
     gpu_tex_entry_t* gt = &gpu_tex_pool[idx];
     if (!gt->tex) return;
 
-    // Project all vertices to screen space
-    float sx[WORLD_MAX_POLY_VERTS], sy[WORLD_MAX_POLY_VERTS];
+    // Convert camera-space fixed-point to float. The GPU vertex shader will
+    // apply our perspective projection matrix, doing the perspective divide
+    // and producing perspective-correct UV interpolation as a side effect.
+    float cx[WORLD_MAX_POLY_VERTS], cy[WORLD_MAX_POLY_VERTS], cz[WORLD_MAX_POLY_VERTS];
     float u [WORLD_MAX_POLY_VERTS], v [WORLD_MAX_POLY_VERTS];
-    bool  visible[WORLD_MAX_POLY_VERTS];
 
     for (int i = 0; i < nv; i++) {
-        visible[i] = world_project(pointlist[i]->x, pointlist[i]->y,
-                                   pointlist[i]->z, &sx[i], &sy[i]);
-        // UVs: Descent stores them as 16.16 fix where 1.0 = full texture.
+        cx[i] = (float)pointlist[i]->x * (1.0f / 65536.0f);
+        cy[i] = (float)pointlist[i]->y * (1.0f / 65536.0f);
+        cz[i] = (float)pointlist[i]->z * (1.0f / 65536.0f);
+        // UVs: Descent stores as 16.16 fix where 1.0 = full texture.
         // Scale by u_scale/v_scale to handle non-POT padding.
         u[i] = (float)uvl_list[i].u * (1.0f / 65536.0f) * gt->u_scale;
         v[i] = (float)uvl_list[i].v * (1.0f / 65536.0f) * gt->v_scale;
@@ -669,7 +717,7 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
     // If any vertex is behind the camera, skip the whole poly for now.
     // Proper near-plane clipping is a Phase 2+ thing.
     for (int i = 0; i < nv; i++) {
-        if (!visible[i]) return;
+        if (cz[i] < WIRE_NEAR) return;
     }
 
     int needed = (nv - 2) * 3;
@@ -692,9 +740,9 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
 
     // Fan triangulation: (v0, v1, v2), (v0, v2, v3), (v0, v3, v4), ...
     for (int i = 1; i < nv - 1; i++) {
-        world_emit_vert(sx[0],   sy[0],   u[0],   v[0]);
-        world_emit_vert(sx[i],   sy[i],   u[i],   v[i]);
-        world_emit_vert(sx[i+1], sy[i+1], u[i+1], v[i+1]);
+        world_emit_vert(cx[0],   cy[0],   cz[0],   u[0],   v[0]);
+        world_emit_vert(cx[i],   cy[i],   cz[i],   u[i],   v[i]);
+        world_emit_vert(cx[i+1], cy[i+1], cz[i+1], u[i+1], v[i+1]);
     }
     batch->vert_count += needed;
 }
