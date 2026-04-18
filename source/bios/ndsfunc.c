@@ -158,7 +158,9 @@ g3_draw_tmap_func_t g3_draw_tmap_func = (g3_draw_tmap_func_t)g3_draw_tmap_tex;
 // fade-table-based vertex coloring.
 // =============================================================================
 
-#define GPU_TEX_MAX  MAX_BITMAP_FILES  // 1500 or 1800 from piggy.h
+#define GPU_TEX_PRELOADED_MAX  MAX_BITMAP_FILES   // 1500-1800 from piggy.h
+#define GPU_TEX_DYNAMIC_MAX    1024                // texmerge composites etc.
+#define GPU_TEX_MAX           (GPU_TEX_PRELOADED_MAX + GPU_TEX_DYNAMIC_MAX)
 
 typedef struct {
     C3D_Tex* tex;        // NULL if not loaded
@@ -169,6 +171,133 @@ typedef struct {
 static gpu_tex_entry_t gpu_tex_pool[GPU_TEX_MAX];
 static int gpu_tex_loaded_count;
 static int gpu_tex_total_bytes;
+
+// -----------------------------------------------------------------------------
+// Texmerge composite tracking
+//
+// Descent's texmerge.c maintains a tiny LRU cache of 10 grs_bitmap* slots.
+// When the game needs an 11th composite, one of the existing slots gets
+// REUSED — same struct pointer, same bm_data buffer, but freshly computed
+// pixels for a different (top, bottom, orientation) combination.
+//
+// If we just upload once on first sight and trust bm->key forever, we'll
+// keep showing stale GPU textures while the game has overwritten the
+// underlying data. Result: textures cycle wildly as the player moves.
+//
+// texmerge sets bmp->key to a composite hash (orient<<30 | top<<16 | bottom)
+// every time it (re)builds a slot. That hash is unique per (top, bottom,
+// orient) combination. So we cache the hash alongside the GPU slot, and
+// re-upload whenever the hash changes for a given grs_bitmap*.
+//
+// MUST be >= MAX_NUM_CACHE_BITMAPS in texmerge.c. The original is 10.
+// Bump this if you bump the texmerge cache.
+#define TEXMERGE_TRACKED_MAX  256
+
+typedef struct {
+    grs_bitmap* bm;            // NULL = empty
+    int         composite_key; // last-seen bm->key
+    int         slot;          // gpu_tex_pool slot
+} texmerge_track_t;
+
+static texmerge_track_t texmerge_track[TEXMERGE_TRACKED_MAX];
+
+// Orphaned slots from the current frame.
+//
+// When a texmerge bitmap's content changes mid-frame, we MUST NOT free the
+// old GPU texture immediately, because earlier batches in world_batches[]
+// still hold a C3D_Tex* pointing at it. Freeing now causes use-after-free
+// when those batches finally render in C3D_FrameEnd.
+//
+// Instead we mark the slot as orphaned and free it at the START of the
+// NEXT frame, after C3D_FrameBegin(SYNCDRAW) has waited for the previous
+// frame's GPU work to complete.
+//
+// Sized generously — even with a huge texmerge cache, mid-frame evictions
+// are rare. 128 is plenty.
+#define ORPHAN_SLOTS_MAX  128
+static int orphan_slots[ORPHAN_SLOTS_MAX];
+static int orphan_slot_count = 0;
+
+// A "composite-looking" key has high bits set (because of the orient<<30).
+// Plain bitmap_index values are small positive ints (0..1800).
+static inline bool is_composite_key(int key)
+{
+    // Either way out of bitmap_index range, or has top bits set
+    return (key < 0) || (key >= GPU_TEX_PRELOADED_MAX);
+}
+
+// -----------------------------------------------------------------------------
+// bm_data pointer -> bitmap index reverse lookup.
+//
+// Some grs_bitmap structs the game passes to g3_draw_tmap_tex are NOT the
+// originals from GameBitmaps[] — they're copies (e.g. Textures[] entries,
+// effect bitmaps, animated wall snapshots). Those copies share the same
+// bm_data pointer as the original (because piggy_bitmap_page_in malloc'd
+// the data once and everyone references it), but their `key` field is
+// uninitialized garbage.
+//
+// We build a hash from bm_data pointer to original index at preload time,
+// then look up via this hash when key is invalid.
+//
+// Open-addressed linear probing, sized 2x the bitmap count for low load
+// factor (~50%) so lookups stay O(1) on average.
+// -----------------------------------------------------------------------------
+#define BM_HASH_SIZE  (MAX_BITMAP_FILES * 2)
+
+typedef struct {
+    void* data;   // bm_data pointer (NULL = empty slot)
+    int   index; // bitmap_index this data belongs to
+} bm_hash_entry_t;
+
+static bm_hash_entry_t bm_hash[BM_HASH_SIZE];
+
+static inline u32 bm_hash_func(void* p)
+{
+    // Mix the high bits down (most pointer entropy is in the middle bits)
+    u32 h = (u32)(uintptr_t)p;
+    h ^= h >> 16;
+    h *= 0x85ebca6b;
+    h ^= h >> 13;
+    return h % BM_HASH_SIZE;
+}
+
+static void bm_hash_clear(void)
+{
+    memset(bm_hash, 0, sizeof(bm_hash));
+}
+
+static void bm_hash_insert(void* data, int index)
+{
+    if (!data) return;
+    u32 slot = bm_hash_func(data);
+    for (int probe = 0; probe < BM_HASH_SIZE; probe++) {
+        u32 i = (slot + probe) % BM_HASH_SIZE;
+        if (bm_hash[i].data == NULL) {
+            bm_hash[i].data  = data;
+            bm_hash[i].index = index;
+            return;
+        }
+        if (bm_hash[i].data == data) {
+            // Already present (multiple bitmaps sharing the same data buffer)
+            // First-inserted wins; nothing to do.
+            return;
+        }
+    }
+    // Table full — should never happen at 50% load factor
+}
+
+// Returns -1 if not found.
+static int bm_hash_lookup(void* data)
+{
+    if (!data) return -1;
+    u32 slot = bm_hash_func(data);
+    for (int probe = 0; probe < BM_HASH_SIZE; probe++) {
+        u32 i = (slot + probe) % BM_HASH_SIZE;
+        if (bm_hash[i].data == NULL) return -1;
+        if (bm_hash[i].data == data) return bm_hash[i].index;
+    }
+    return -1;
+}
 
 // Round up to next power of two
 static inline int next_pot(int n)
@@ -243,15 +372,14 @@ static u8* decompress_rle(grs_bitmap* bmp)
     return out;
 }
 
-// Upload one bitmap to the GPU texture pool.
-// Returns true on success.
-static bool gpu_tex_upload_one(int idx)
+// Core upload: take any bitmap and put it in the given pool slot.
+// Returns true on success. Used by both preload and dynamic upload paths.
+static bool gpu_tex_upload_to_slot(grs_bitmap* bmp, int slot)
 {
-    grs_bitmap* bmp = &GameBitmaps[idx];
-
-    // Skip empty / unloaded bitmaps
     if (bmp->bm_w <= 0 || bmp->bm_h <= 0) return false;
     if (!bmp->bm_data) return false;
+    if (slot < 0 || slot >= GPU_TEX_MAX) return false;
+    if (gpu_tex_pool[slot].tex) return false;  // slot already used
 
     // Decompress if RLE
     u8* indexed_data;
@@ -297,17 +425,64 @@ static bool gpu_tex_upload_one(int idx)
     if (we_allocated) free(indexed_data);
 
     // Store in pool
-    gpu_tex_pool[idx].tex     = tex;
-    gpu_tex_pool[idx].u_scale = (float)bmp->bm_w / (float)pot_w;
-    gpu_tex_pool[idx].v_scale = (float)bmp->bm_h / (float)pot_h;
+    gpu_tex_pool[slot].tex     = tex;
+    gpu_tex_pool[slot].u_scale = (float)bmp->bm_w / (float)pot_w;
+    gpu_tex_pool[slot].v_scale = (float)bmp->bm_h / (float)pot_h;
     gpu_tex_total_bytes += pot_w * pot_h * sizeof(u16);
     gpu_tex_loaded_count++;
 
-    // Tag the bitmap with our index so g3_draw_tmap_tex can find us.
-    // page_out_all() resets this to -1, which is why we do it here at upload.
-    bmp->key = idx;
+    // Tag the bitmap with our slot so g3_draw_tmap_tex can find us.
+    bmp->key = slot;
+
+    // Also register in the data-pointer hash so future bitmaps that share
+    // this bm_data buffer can be resolved via reverse lookup.
+    bm_hash_insert(bmp->bm_data, slot);
 
     return true;
+}
+
+// Preload path: upload a bitmap from GameBitmaps[idx] into pool slot idx.
+static bool gpu_tex_upload_one(int idx)
+{
+    return gpu_tex_upload_to_slot(&GameBitmaps[idx], idx);
+}
+
+// Dynamic upload path: find a free slot in the dynamic range and upload there.
+// Returns the slot index on success, or -1 on failure (no free slots, or
+// the bitmap is invalid). Used at draw time for texmerge composites and
+// other bitmaps not in GameBitmaps[].
+static int gpu_tex_upload_dynamic(grs_bitmap* bmp)
+{
+    if (!bmp || !bmp->bm_data) return -1;
+
+    // Linear scan for a free slot in the dynamic range. Slow if dynamic
+    // pool fills up but typically we'll find a slot in the first few
+    // iterations since textures get added once at level load and stay.
+    static int next_slot_hint = GPU_TEX_PRELOADED_MAX;
+    for (int probe = 0; probe < GPU_TEX_DYNAMIC_MAX; probe++) {
+        int slot = GPU_TEX_PRELOADED_MAX +
+                   ((next_slot_hint - GPU_TEX_PRELOADED_MAX + probe) % GPU_TEX_DYNAMIC_MAX);
+        if (!gpu_tex_pool[slot].tex) {
+            if (gpu_tex_upload_to_slot(bmp, slot)) {
+                next_slot_hint = slot + 1;
+                return slot;
+            }
+            return -1;
+        }
+    }
+    return -1;  // dynamic pool full
+}
+
+// Free a single slot in the pool. Used for re-uploading a texmerge
+// composite when its content has changed.
+static void gpu_tex_free_slot(int slot)
+{
+    if (slot < 0 || slot >= GPU_TEX_MAX) return;
+    if (!gpu_tex_pool[slot].tex) return;
+    C3D_TexDelete(gpu_tex_pool[slot].tex);
+    free(gpu_tex_pool[slot].tex);
+    gpu_tex_pool[slot].tex = NULL;
+    gpu_tex_loaded_count--;
 }
 
 // Free the entire GPU texture pool. Called at the start of each rebuild.
@@ -320,8 +495,38 @@ static void gpu_tex_free_all(void)
             gpu_tex_pool[i].tex = NULL;
         }
     }
+    bm_hash_clear();
+    memset(texmerge_track, 0, sizeof(texmerge_track));
     gpu_tex_loaded_count = 0;
     gpu_tex_total_bytes = 0;
+}
+
+// Find or create a texmerge tracking entry for this bitmap.
+// Returns a pointer to the entry. Never returns NULL (we evict if full).
+static texmerge_track_t* texmerge_track_get(grs_bitmap* bm)
+{
+    // First pass: existing entry
+    for (int i = 0; i < TEXMERGE_TRACKED_MAX; i++) {
+        if (texmerge_track[i].bm == bm) return &texmerge_track[i];
+    }
+    // Second pass: empty slot
+    for (int i = 0; i < TEXMERGE_TRACKED_MAX; i++) {
+        if (texmerge_track[i].bm == NULL) {
+            texmerge_track[i].bm = bm;
+            texmerge_track[i].composite_key = 0;  // sentinel: forces re-upload
+            texmerge_track[i].slot = -1;
+            return &texmerge_track[i];
+        }
+    }
+    // Full — evict slot 0 (texmerge has only 10 entries; 16 should always
+    // be enough so we should never get here)
+    if (texmerge_track[0].slot >= 0) {
+        gpu_tex_free_slot(texmerge_track[0].slot);
+    }
+    texmerge_track[0].bm = bm;
+    texmerge_track[0].composite_key = 0;
+    texmerge_track[0].slot = -1;
+    return &texmerge_track[0];
 }
 
 // Page in every bitmap that has a piggy file offset, then upload it to GPU.
@@ -577,6 +782,15 @@ static void world_frame_begin(void)
 #if WORLD_MODE == WORLD_MODE_TEXTURED
     world_batch_count = 0;
     world_last_tex = NULL;
+
+    // Free any GPU textures orphaned during the PREVIOUS frame.
+    // Safe here: bitblt_to_screen already called C3D_FrameEnd, and the
+    // next C3D_FrameBegin(SYNCDRAW) will block until GPU completion before
+    // we issue any new draws referencing fresh textures.
+    for (int i = 0; i < orphan_slot_count; i++) {
+        gpu_tex_free_slot(orphan_slots[i]);
+    }
+    orphan_slot_count = 0;
 #endif
 }
 
@@ -630,7 +844,6 @@ static void world_frame_end(void)
     C3D_DrawArrays(GPU_TRIANGLES, 0, world_vbo_count);
 #else
     // One draw call per accumulated batch (one per unique texture run).
-    // Phase 3 will sort/merge these for fewer binds.
     for (int i = 0; i < world_batch_count; i++) {
         world_batch_t* b = &world_batches[i];
         if (b->vert_count == 0) continue;
@@ -689,17 +902,94 @@ ITCM_CODE void g3_draw_poly(int nv, vms_vector** pointlist)
     (void)nv; (void)pointlist;
 }
 
+// -----------------------------------------------------------------------------
+// Debug: log unique missing-texture skips so we can figure out why some
+// walls don't render. Set DEBUG_MISSING_TEXTURES to 1 to enable.
+// Logs each unique bitmap pointer we reject only once.
+// -----------------------------------------------------------------------------
+#define DEBUG_MISSING_TEXTURES 1
+
+#if DEBUG_MISSING_TEXTURES
+#define MISSING_LOG_MAX 64
+static grs_bitmap* missing_logged[MISSING_LOG_MAX];
+static int missing_logged_count = 0;
+
+static void log_missing_bitmap(grs_bitmap* bm, const char* reason)
+{
+    // Already logged this pointer?
+    for (int i = 0; i < missing_logged_count; i++) {
+        if (missing_logged[i] == bm) return;
+    }
+    if (missing_logged_count >= MISSING_LOG_MAX) return;
+    missing_logged[missing_logged_count++] = bm;
+
+    printf("MISSING [%s]: bm=%p key=%d w=%d h=%d flags=0x%x data=%p\n",
+           reason, (void*)bm, bm ? bm->key : -999,
+           bm ? bm->bm_w : 0, bm ? bm->bm_h : 0,
+           bm ? bm->bm_flags : 0, bm ? (void*)bm->bm_data : NULL);
+}
+#else
+#define log_missing_bitmap(bm, reason) ((void)0)
+#endif
+
 ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
                                 g3s_uvl* uvl_list, grs_bitmap* bm)
 {
     if (nv < 3 || !bm) return;
     if (nv > WORLD_MAX_POLY_VERTS) nv = WORLD_MAX_POLY_VERTS;
 
-    // Look up the GPU texture for this bitmap. bmp->key was set at preload.
-    int idx = bm->key;
-    if (idx < 0 || idx >= GPU_TEX_MAX) return;
+    // Look up the GPU texture for this bitmap. Stages:
+    //
+    //   1. Composite-key bitmap (from texmerge): the same grs_bitmap* gets
+    //      reused for different content as the LRU cache evicts entries.
+    //      Track per-bitmap by pointer, re-upload when composite key changes.
+    //   2. Fast path: bmp->key is a valid bitmap_index from preload.
+    //   3. Hash lookup: matches a preloaded bitmap by bm_data pointer.
+    //   4. Dynamic upload: brand-new bitmap we've never seen.
+    int idx;
+    if (is_composite_key(bm->key)) {
+        // Texmerge composite. Track this struct pointer and watch for
+        // content changes (which texmerge signals by changing bm->key).
+        texmerge_track_t* tt = texmerge_track_get(bm);
+        if (tt->slot < 0 || tt->composite_key != bm->key) {
+            // First time seeing this bitmap, OR its content changed.
+            // DON'T free the old GPU texture now — earlier batches in this
+            // frame still reference it. Mark it as orphaned for free at
+            // the start of the next frame (when GPU work has completed).
+            if (tt->slot >= 0 && orphan_slot_count < ORPHAN_SLOTS_MAX) {
+                orphan_slots[orphan_slot_count++] = tt->slot;
+            }
+            tt->slot = gpu_tex_upload_dynamic(bm);
+            if (tt->slot < 0) {
+                log_missing_bitmap(bm, "texmerge-upload-failed");
+                return;
+            }
+            tt->composite_key = bm->key;
+            // gpu_tex_upload_to_slot patched bm->key to the slot index.
+            // Restore the composite key so we can detect the next change.
+            bm->key = tt->composite_key;
+        }
+        idx = tt->slot;
+    } else {
+        idx = bm->key;
+        if (idx < 0 || idx >= GPU_TEX_MAX || !gpu_tex_pool[idx].tex) {
+            idx = bm_hash_lookup(bm->bm_data);
+            if (idx < 0 || !gpu_tex_pool[idx].tex) {
+                idx = gpu_tex_upload_dynamic(bm);
+                if (idx < 0) {
+                    log_missing_bitmap(bm, "upload-failed");
+                    return;
+                }
+            } else {
+                bm->key = idx;  // cache for next time
+            }
+        }
+    }
     gpu_tex_entry_t* gt = &gpu_tex_pool[idx];
-    if (!gt->tex) return;
+    if (!gt->tex) {
+        log_missing_bitmap(bm, "no-gpu-tex");
+        return;
+    }
 
     // Convert camera-space fixed-point to float. The GPU vertex shader will
     // apply our perspective projection matrix, doing the perspective divide
@@ -713,8 +1003,9 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
         in_cz[i] = (float)pointlist[i]->z * (1.0f / 65536.0f);
         // UVs: Descent stores as 16.16 fix where 1.0 = full texture.
         // Scale by u_scale/v_scale to handle non-POT padding.
+        // Flip V — Descent's V origin is opposite from PICA200's.
         in_u[i] = (float)uvl_list[i].u * (1.0f / 65536.0f) * gt->u_scale;
-        in_v[i] = (float)uvl_list[i].v * (1.0f / 65536.0f) * gt->v_scale;
+        in_v[i] = gt->v_scale - (float)uvl_list[i].v * (1.0f / 65536.0f) * gt->v_scale;
     }
 
     // -------------------------------------------------------------------------
@@ -792,12 +1083,30 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
 #endif // WORLD_MODE
 
 // =============================================================================
-// g3_draw_tmap_flat / g3_draw_bitmap — still routed to draw_poly for visibility
+// g3_draw_tmap_flat / g3_draw_bitmap
 // =============================================================================
+//
+// g3_draw_tmap_flat is the software renderer's "flat-shaded textured polygon"
+// path — same vertex format as tmap_tex but the renderer ignores u,v and
+// just fills with bm->avg_color * lighting. It's used for distant walls (a
+// software perf optimization) and for special effects like cloaked enemies.
+//
+// On a GPU there's no perf reason to flat-shade, and the polygons look
+// better with their actual texture. So we route flat -> tex in TEXTURED
+// mode. Tradeoff: cloaked enemies will look textured rather than shimmery.
+// We can revisit with a real flat path later if we want the effect back.
+//
+// In WIREFRAME mode, both still route through g3_draw_poly so outlines
+// continue to draw.
 ITCM_CODE void g3_draw_tmap_flat(int nv, vms_vector** pointlist,
-                                 g3s_uvl* uvl_list, grs_bitmap* bm) {
+                                 g3s_uvl* uvl_list, grs_bitmap* bm)
+{
+#if WORLD_MODE == WORLD_MODE_TEXTURED
+    g3_draw_tmap_tex(nv, pointlist, uvl_list, bm);
+#else
     (void)uvl_list; (void)bm;
     g3_draw_poly(nv, pointlist);
+#endif
 }
 
 ITCM_CODE void g3_draw_bitmap(vms_vector* pos, fix width, fix height, grs_bitmap* bm) {

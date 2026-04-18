@@ -132,7 +132,7 @@ static char rcsid[] = "$Id: TEXMERGE.C 1.1 1995/05/16 15:31:36 allender Exp $";
 #include "rle.h"
 #include "piggy.h"
 
-#define MAX_NUM_CACHE_BITMAPS 10
+#define MAX_NUM_CACHE_BITMAPS 256
 
 //static grs_bitmap * cache_bitmaps[MAX_NUM_CACHE_BITMAPS];                     
 
