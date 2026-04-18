@@ -176,16 +176,6 @@ ITCM_CODE bool g3_draw_polygon_model(void *model_ptr,grs_bitmap **model_bitmaps,
 				// 3DS port: transform object-space verts to camera space
 				xform_model_pts(nv, point_list);
         // In OP_TMAPPOLY case, right before the g3_draw_tmap_func call:
-        {
-            static int dbg = 0;
-            if (dbg < 10) {
-                printf("model poly: nv=%d v0=(%ld,%ld,%ld)\n", nv,
-                    (long)Model_xformed_pts[0].x,
-                    (long)Model_xformed_pts[0].y,
-                    (long)Model_xformed_pts[0].z);
-                dbg++;
-            }
-        }
 				g3_draw_tmap_func(nv, Model_xformed_ptrs, uvl_list,
 				                  model_bitmaps[w(p+28)]);
 

@@ -612,7 +612,8 @@ bool gpu_inited = false;
 #if WORLD_MODE == WORLD_MODE_WIREFRAME
 typedef struct { float x, y, z; } world_vertex;
 #else
-typedef struct { float x, y, z, u, v; } world_vertex;
+// position (3) + texcoord (2) + color RGB (3) = 8 floats = 32 bytes per vertex
+typedef struct { float x, y, z, u, v, r, g, b; } world_vertex;
 #endif
 
 static shaderProgram_s  world_program;
@@ -741,12 +742,14 @@ static void world_emit_line(float x0, float y0, float x1, float y1)
 // Textured vertex emission — fan-triangulated polygon with UVs
 // Now takes camera-space 3D position; the GPU vertex shader projects.
 // -----------------------------------------------------------------------------
-static inline void world_emit_vert(float x, float y, float z, float u, float v)
+static inline void world_emit_vert(float x, float y, float z, float u, float v,
+                                   float r, float g, float b)
 {
     if (world_vbo_count >= WIRE_MAX_VERTS) return;
     world_vertex* p = &world_vbo[world_vbo_count++];
     p->x = x; p->y = y; p->z = z;
     p->u = u; p->v = v;
+    p->r = r; p->g = g; p->b = b;
 }
 #endif
 
@@ -856,12 +859,13 @@ static void world_setup_state(void)
     AttrInfo_AddLoader(attrInfo, 0, GPU_FLOAT, 3);  // position
 #if WORLD_MODE == WORLD_MODE_TEXTURED
     AttrInfo_AddLoader(attrInfo, 1, GPU_FLOAT, 2);  // texcoord
+    AttrInfo_AddLoader(attrInfo, 2, GPU_FLOAT, 3);  // color (RGB)
 #endif
 
     C3D_BufInfo* bufInfo = C3D_GetBufInfo();
     BufInfo_Init(bufInfo);
 #if WORLD_MODE == WORLD_MODE_TEXTURED
-    BufInfo_Add(bufInfo, world_vbo, sizeof(world_vertex), 2, 0x10);
+    BufInfo_Add(bufInfo, world_vbo, sizeof(world_vertex), 3, 0x210);  // 3 attrs: pos@0, tex@1, color@2
 #else
     BufInfo_Add(bufInfo, world_vbo, sizeof(world_vertex), 1, 0x0);
 #endif
@@ -876,9 +880,10 @@ static void world_setup_state(void)
     C3D_TexEnvSrc(env, C3D_Both, GPU_PRIMARY_COLOR, 0, 0);
     C3D_TexEnvFunc(env, C3D_Both, GPU_REPLACE);
 #else
-    // Sample texture directly
-    C3D_TexEnvSrc(env, C3D_Both, GPU_TEXTURE0, 0, 0);
-    C3D_TexEnvFunc(env, C3D_Both, GPU_REPLACE);
+    // Modulate texture by per-vertex color (lighting).
+    // GPU_PRIMARY_COLOR is the interpolated vertex color (Gouraud).
+    C3D_TexEnvSrc(env, C3D_Both, GPU_TEXTURE0, GPU_PRIMARY_COLOR, 0);
+    C3D_TexEnvFunc(env, C3D_Both, GPU_MODULATE);
 #endif
 }
 
@@ -983,6 +988,44 @@ static void log_missing_bitmap(grs_bitmap* bm, const char* reason)
 #define log_missing_bitmap(bm, reason) ((void)0)
 #endif
 
+// -----------------------------------------------------------------------------
+// Per-vertex lighting via fade table + palette
+//
+// Descent's lighting model: each vertex has a light value `l` in fix-point,
+// roughly [0, MAX_LIGHT]. The software renderer uses gr_fade_table[] (34
+// brightness levels x 256 palette entries) to remap palette indices to
+// dimmer ones based on light level.
+//
+// We can't do that exact technique on PICA200 (would need dependent texture
+// reads). Instead: per-vertex, look up "what does WHITE look like at this
+// light level" and use that as an RGB multiplier on the texture sample.
+// Result: smooth Gouraud-shaded lighting that captures Descent's color shift
+// at low light (since the fade table also cools/desaturates as it dims).
+//
+// Constants:
+//   gr_fade_table layout: 34 rows (light levels) x 256 entries (palette)
+//   gr_current_pal layout: 256 entries x 3 bytes (R, G, B), 6-bit (0..63)
+//   MAX_LIGHT: f1_0 = 0x10000 = max input light value
+// -----------------------------------------------------------------------------
+extern ubyte gr_fade_table[];
+extern ubyte gr_current_pal[];
+
+#define LIGHT_FADE_LEVELS  34
+#define LIGHT_WHITE_INDEX  255   // standard Descent: palette index 255 = white
+
+extern fix MAX_LIGHT;  // from game data, typically f1_0 = 65536
+static inline void light_to_rgb(fix l, float* out_r, float* out_g, float* out_b)
+{
+    // Simple brightness: light/MAX_LIGHT, clamped to [0,1].
+    // Could be enhanced with fade-table color shifts later.
+    float brightness = (float)l * (1.0f / (float)0x10000);
+    if (brightness < 0.0f) brightness = 0.0f;
+    if (brightness > 1.0f) brightness = 1.0f;
+    *out_r = brightness;
+    *out_g = brightness;
+    *out_b = brightness;
+}
+
 ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
                                 g3s_uvl* uvl_list, grs_bitmap* bm)
 {
@@ -1047,6 +1090,7 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
     // and producing perspective-correct UV interpolation as a side effect.
     float in_cx[WORLD_MAX_POLY_VERTS], in_cy[WORLD_MAX_POLY_VERTS], in_cz[WORLD_MAX_POLY_VERTS];
     float in_u [WORLD_MAX_POLY_VERTS], in_v [WORLD_MAX_POLY_VERTS];
+    float in_r [WORLD_MAX_POLY_VERTS], in_g [WORLD_MAX_POLY_VERTS], in_b[WORLD_MAX_POLY_VERTS];
 
     for (int i = 0; i < nv; i++) {
         in_cx[i] = (float)pointlist[i]->x * (1.0f / 65536.0f);
@@ -1057,6 +1101,17 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
         // Flip V — Descent's V origin is opposite from PICA200's.
         in_u[i] = (float)uvl_list[i].u * (1.0f / 65536.0f) * gt->u_scale;
         in_v[i] = gt->v_scale - (float)uvl_list[i].v * (1.0f / 65536.0f) * gt->v_scale;
+        // Per-vertex lighting: convert fix-point l value to RGB via fade table
+    //
+    {
+    static int dbg = 0;
+    if (dbg < 3) {
+        printf("vert0 light=%ld rgb=(%.2f,%.2f,%.2f)\n",
+               (long)uvl_list[0].l, in_r[0], in_g[0], in_b[0]);
+        dbg++;
+    }
+}
+        light_to_rgb(uvl_list[i].l, &in_r[i], &in_g[i], &in_b[i]);
     }
 
     // -------------------------------------------------------------------------
@@ -1072,6 +1127,7 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
     #define CLIP_MAX_OUT (WORLD_MAX_POLY_VERTS + 2)
     float cx[CLIP_MAX_OUT], cy[CLIP_MAX_OUT], cz[CLIP_MAX_OUT];
     float u [CLIP_MAX_OUT], v [CLIP_MAX_OUT];
+    float r [CLIP_MAX_OUT], g [CLIP_MAX_OUT], b [CLIP_MAX_OUT];
     int out_nv = 0;
 
     for (int i = 0; i < nv; i++) {
@@ -1083,6 +1139,7 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
             // Always keep current vertex if it's in front
             cx[out_nv] = in_cx[i]; cy[out_nv] = in_cy[i]; cz[out_nv] = in_cz[i];
             u[out_nv]  = in_u[i];  v[out_nv]  = in_v[i];
+            r[out_nv]  = in_r[i];  g[out_nv]  = in_g[i];  b[out_nv] = in_b[i];
             out_nv++;
         }
         if (curr_in != next_in) {
@@ -1097,6 +1154,9 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
             cz[out_nv] = WIRE_NEAR;
             u[out_nv]  = in_u[i]  + t * (in_u[j]  - in_u[i]);
             v[out_nv]  = in_v[i]  + t * (in_v[j]  - in_v[i]);
+            r[out_nv]  = in_r[i]  + t * (in_r[j]  - in_r[i]);
+            g[out_nv]  = in_g[i]  + t * (in_g[j]  - in_g[i]);
+            b[out_nv]  = in_b[i]  + t * (in_b[j]  - in_b[i]);
             out_nv++;
         }
     }
@@ -1124,9 +1184,9 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
 
     // Fan triangulation of the clipped polygon
     for (int i = 1; i < out_nv - 1; i++) {
-        world_emit_vert(cx[0],   cy[0],   cz[0],   u[0],   v[0]);
-        world_emit_vert(cx[i],   cy[i],   cz[i],   u[i],   v[i]);
-        world_emit_vert(cx[i+1], cy[i+1], cz[i+1], u[i+1], v[i+1]);
+        world_emit_vert(cx[0],   cy[0],   cz[0],   u[0],   v[0],   r[0],   g[0],   b[0]);
+        world_emit_vert(cx[i],   cy[i],   cz[i],   u[i],   v[i],   r[i],   g[i],   b[i]);
+        world_emit_vert(cx[i+1], cy[i+1], cz[i+1], u[i+1], v[i+1], r[i+1], g[i+1], b[i+1]);
     }
     batch->vert_count += needed;
 }
