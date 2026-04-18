@@ -42,3 +42,10 @@ output/*
 
 DESCENT.HOG
 DESCENT.PIG
+
+.cache/
+.cache/*
+.clangd
+
+*.swp
+compile_commands.json
