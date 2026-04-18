@@ -137,7 +137,7 @@ void print_exit_message(void)
 {
 	if (*exit_message)
 	{
-		set_error_console ();
+		//set_error_console ();
 		printf("%s\n",exit_message);
 	}
 }

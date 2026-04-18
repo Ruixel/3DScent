@@ -1,3 +1,17 @@
+// =============================================================================
+// ndsfunc.c — 3DS rendering backend
+// =============================================================================
+// Renders the game's 320x200 palette-indexed back_buffer to the top screen by:
+//   1. Converting palette indices to RGBA8 in a linear staging buffer
+//   2. Software-tiling the staging buffer into a PICA200 tiled texture
+//   3. Drawing a textured quad covering the top screen
+//
+// Palette index 0 is treated as transparent (alpha blended against clear color).
+//
+// Debug render modes are available via RENDER_MODE — leave on BITBLT for
+// normal gameplay. See "Debug modes" section at the bottom of this file.
+// =============================================================================
+
 #include <malloc.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -8,191 +22,229 @@
 
 #include "fix.h"
 #include "gr.h"
-
 #include "key.h"
 #include "mouse.h"
-
 #include "3d.h"
 #include "game.h"
 #include "grdef.h"
-
 #include "error.h"
+#include "mem.h"
+#include "ndsfunc.h"
+#include "softkey.h"
+#include "vshader_shbin.h"
 
-//#include "texmap.h"
-#define	NUM_LIGHTING_LEVELS 32
-#define MAX_LIGHTING_VALUE	((NUM_LIGHTING_LEVELS-1)*F1_0/NUM_LIGHTING_LEVELS)
+// -----------------------------------------------------------------------------
+// Render mode selection
+// -----------------------------------------------------------------------------
+#define RENDER_MODE_BITBLT       0  // Normal gameplay: palette -> RGBA -> quad
+#define RENDER_MODE_TRIANGLE     1  // Debug: colored triangle (requires color shader)
+#define RENDER_MODE_SOLID        2  // Debug: solid-red quad
+#define RENDER_MODE_CHECKERBOARD 3  // Debug: 32x32 red/white checker
+#define RENDER_MODE_RAW_WRITE    4  // Debug: bypass tiler, write tex->data directly
+
+#define RENDER_MODE  RENDER_MODE_BITBLT
+
+// -----------------------------------------------------------------------------
+// Lighting constants (used by game code, not rendering)
+// -----------------------------------------------------------------------------
+#define NUM_LIGHTING_LEVELS 32
+#define MAX_LIGHTING_VALUE  ((NUM_LIGHTING_LEVELS-1)*F1_0/NUM_LIGHTING_LEVELS)
 int Lighting_on;
 int Max_perspective_depth, Max_linear_depth, Current_seg_depth;
 
-#include "mem.h"
-#include "ndsfunc.h"
+// -----------------------------------------------------------------------------
+// Framebuffer state shared with game code
+// -----------------------------------------------------------------------------
+ALIGN(4) u8 back_buffer[400 * 240];
+u16         ds_palette[256];
+int         palette_updated;
+bool        doSleep;
 
-#include "softkey.h"
+// -----------------------------------------------------------------------------
+// GPU state
+// -----------------------------------------------------------------------------
+static C3D_RenderTarget* target;
+static DVLB_s*           vshader_dvlb;
+static shaderProgram_s   program;
+static int               uLoc_projection;
+static C3D_Mtx           projection;
+static void*             vbo_data;
 
-#include "vshader_shbin.h"
+// Top screen is 240x400 physical, rendered as 400x240 landscape via OrthoTilt.
+#define SCREEN_W  400
+#define SCREEN_H  240
 
-//#define WIFI_DEBUG
-//#define NO3D
-#define EXCEPT_DEBUG
-//#define CONSOLE
-
-ITCM_CODE void g3_draw_poly (int nv, vms_vector **pointlist);
-ITCM_CODE void g3_draw_tmap (int nv, vms_vector **pointlist, g3s_uvl *uvl_list, grs_bitmap *bm);
-ITCM_CODE void g3_draw_bitmap (vms_vector *pos,fix width,fix height,grs_bitmap *bm);
-
-#define front_buffer_top	((u16 *)0x06000000)
-#define front_buffer_bottom	((u16 *)0x06200000)
-ALIGN(4) u8	back_buffer[(400*240)];
-u16	ds_palette[256];
-
-int	palette_updated;
-
-#define palette_top		((u16 *)0x5000000)
-#define palette_bottom	((u16 *)0x5000400)
-#define palette3d		((u16 *)0x6890000)
-
-#define TEX_SIZE	64
-#define MY_TEXTURE_SIZE	TEXTURE_SIZE_64
-
-#define TEXTURE_MEMORY	(128 * 1024 * 4)
-#define MAX_GL_TEXTURES	(TEXTURE_MEMORY / (TEX_SIZE * TEX_SIZE))
-
-#define MAX_TEX_BUFFER	24
-ALIGN(4) u8	textures[MAX_TEX_BUFFER][TEX_SIZE * TEX_SIZE];
-typedef struct texture_ll_s
-{
-	u8	*texture;
-	u32	*addr;
-	struct texture_ll_s	*next;
-} texture_ll_t;
-
-texture_ll_t	texture_ll_pool[MAX_TEX_BUFFER], *texture_ll, *texture_ll_free;
-
-
-// 3ds shit
-C3D_RenderTarget* target;
-
-static DVLB_s* vshader_dvlb;
-static shaderProgram_s program;
-static int uLoc_projection;
-static C3D_Mtx projection;
-static void* vbo_data;
-
-#define CLEAR_COLOR 0x000000FF
+// Clear to black for gameplay. Swap to 0x68B0D8FF if you want a visible
+// background behind transparent (palette-index-0) pixels during testing.
+//#define CLEAR_COLOR  0x000000FF
+#define CLEAR_COLOR 0x68B0D8FF  // light blue
 
 #define DISPLAY_TRANSFER_FLAGS \
     (GX_TRANSFER_FLIP_VERT(0) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) | \
-    GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8) | \
-    GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
+     GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | \
+     GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8) | \
+     GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
 
-// Vertex: position xyz + texcoord uv
-typedef struct { float x, y, z; float u, v; } vertex;
+// =============================================================================
+// Stubs for game-side hooks that this backend doesn't need on 3DS.
+// Kept as no-ops so the rest of the game links cleanly.
+// =============================================================================
+ITCM_CODE void sync_palette()        {}
+ITCM_CODE void irq_Vblank()          {}
+ITCM_CODE void irq_arm9_fifo()       {}
+void ds_start_frame()                {}
+void ds_end_frame()                  {}
+void nds_set_render_size(int x, int y, int w, int h) { (void)x; (void)y; (void)w; (void)h; }
+void init_nds_textures()             {}
+void nds_init()                      {}
 
-// back_buffer is 320x200, texture is 512x256 (power-of-2)
+// Legacy NDS-era bitmap/texture cache, unused on 3DS. Left as stubs so the
+// game's draw calls still link — rendering of actual geometry is TBD.
+typedef struct {
+    int         last_frame_used;
+    int         key;
+    u32         format;
+    grs_bitmap* bm;
+} gltexture_t;
+
+int find_bitmap_in_vram(int key)                 { (void)key; return -1; }
+ITCM_CODE void bind_texture(grs_bitmap* bmp)     { (void)bmp; }
+
+g3_draw_tmap_func_t g3_draw_tmap_func = (g3_draw_tmap_func_t)g3_draw_tmap_tex;
+
+ITCM_CODE void g3_draw_poly(int nv, vms_vector** pointlist) {
+    (void)nv; (void)pointlist;
+}
+ITCM_CODE void g3_draw_tmap_flat(int nv, vms_vector** pointlist, g3s_uvl* uvl_list, grs_bitmap* bm) {
+    (void)nv; (void)pointlist; (void)uvl_list; (void)bm;
+}
+ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist, g3s_uvl* uvl_list, grs_bitmap* bm) {
+    (void)nv; (void)pointlist; (void)uvl_list; (void)bm;
+}
+ITCM_CODE void g3_draw_bitmap(vms_vector* pos, fix width, fix height, grs_bitmap* bm) {
+    (void)pos; (void)width; (void)height; (void)bm;
+}
+
+// =============================================================================
+// TRIANGLE MODE — simplest possible GPU sanity test
+// =============================================================================
+#if RENDER_MODE == RENDER_MODE_TRIANGLE
+
+// NOTE: requires the position+color vertex shader (vshader_triangle.v.pica).
+
+typedef struct { float x, y, z; float r, g, b, a; } tri_vertex;
+
+static const tri_vertex triangle_verts[] = {
+    { 200.0f,  40.0f, 0.5f,  1.0f, 0.0f, 0.0f, 1.0f },
+    {  60.0f, 200.0f, 0.5f,  0.0f, 1.0f, 0.0f, 1.0f },
+    { 340.0f, 200.0f, 0.5f,  0.0f, 0.0f, 1.0f, 1.0f },
+};
+#define triangle_vert_count 3
+
+void sceneInit(void)
+{
+    vshader_dvlb = DVLB_ParseFile((u32*)vshader_shbin, vshader_shbin_size);
+    shaderProgramInit(&program);
+    shaderProgramSetVsh(&program, &vshader_dvlb->DVLE[0]);
+    C3D_BindProgram(&program);
+
+    uLoc_projection = shaderInstanceGetUniformLocation(program.vertexShader, "projection");
+
+    C3D_AttrInfo* attrInfo = C3D_GetAttrInfo();
+    AttrInfo_Init(attrInfo);
+    AttrInfo_AddLoader(attrInfo, 0, GPU_FLOAT, 3);
+    AttrInfo_AddLoader(attrInfo, 1, GPU_FLOAT, 4);
+
+    Mtx_OrthoTilt(&projection, 0.0f, SCREEN_W, SCREEN_H, 0.0f, 0.0f, 1.0f, true);
+
+    vbo_data = linearAlloc(sizeof(triangle_verts));
+    memcpy(vbo_data, triangle_verts, sizeof(triangle_verts));
+
+    C3D_BufInfo* bufInfo = C3D_GetBufInfo();
+    BufInfo_Init(bufInfo);
+    BufInfo_Add(bufInfo, vbo_data, sizeof(tri_vertex), 2, 0x10);
+
+    C3D_CullFace(GPU_CULL_NONE);
+    C3D_DepthTest(false, GPU_ALWAYS, GPU_WRITE_ALL);
+
+    C3D_TexEnv* env = C3D_GetTexEnv(0);
+    C3D_TexEnvInit(env);
+    C3D_TexEnvSrc(env, C3D_Both, GPU_PRIMARY_COLOR, 0, 0);
+    C3D_TexEnvFunc(env, C3D_Both, GPU_REPLACE);
+}
+
+void bitblt_to_screen(void)
+{
+    hidScanInput();
+    keyboard_handler();
+
+    C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+    C3D_RenderTargetClear(target, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
+    C3D_FrameDrawOn(target);
+    C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLoc_projection, &projection);
+    C3D_DrawArrays(GPU_TRIANGLES, 0, triangle_vert_count);
+    C3D_FrameEnd(0);
+}
+
+// =============================================================================
+// TEXTURED MODES (BITBLT, SOLID, CHECKERBOARD, RAW_WRITE)
+// All share the same setup; they only differ in how tex_buf is populated.
+// =============================================================================
+#else
+
+// NOTE: requires the position+texcoord vertex shader (vshader.v.pica).
+// Make sure it has an explicit `.entry vmain` and uses `.in` (not `.alias`)
+// for v0/v1 — PICA200 hardware is strict about these, emulators are not.
+
+// -----------------------------------------------------------------------------
+// Texture dimensions
+// -----------------------------------------------------------------------------
+#define TEX_W     512   // PICA200 requires power-of-two textures
+#define TEX_H     256
+#define GAME_W    320   // Game's native back_buffer width
+#define GAME_H    200   // Game's native back_buffer height
+#define UPLOAD_H  256   // Rows we actually upload (must cover the UV sample range)
+
+// -----------------------------------------------------------------------------
+// Quad covering most of the top screen with the game's aspect ratio
+// -----------------------------------------------------------------------------
+typedef struct { float x, y, z; float u, v; } tex_vertex;
+
 #define QUAD_X_MARGIN  40.0f
 #define QUAD_Y_MARGIN  20.0f
-#define QUAD_X0        QUAD_X_MARGIN 
-#define QUAD_X1        400.0f - QUAD_X_MARGIN
-#define QUAD_Y0        QUAD_Y_MARGIN 
-#define QUAD_Y1        240.0f - QUAD_Y_MARGIN
-#define QUAD_TEX_U     (320.0f / 512.0f)
-#define QUAD_TEX_V     (56.0f / 256.0f)
+#define QUAD_X0        QUAD_X_MARGIN
+#define QUAD_X1        (SCREEN_W - QUAD_X_MARGIN)
+#define QUAD_Y0        QUAD_Y_MARGIN
+#define QUAD_Y1        (SCREEN_H - QUAD_Y_MARGIN)
+#define QUAD_TEX_U     ((float)GAME_W / (float)TEX_W)
+#define QUAD_TEX_V     (56.0f / (float)TEX_H)
 
-static const vertex quad_list[] = {
-    // Triangle 1 — V coords flipped so texture is right-side up
-    { QUAD_X0, QUAD_Y1, 0.5f, 0.0f,      QUAD_TEX_V}, // top-left
-    { QUAD_X1, QUAD_Y1, 0.5f, QUAD_TEX_U,QUAD_TEX_V}, // top-right
-    { QUAD_X1, QUAD_Y0, 0.5f, QUAD_TEX_U,1.0f      }, // bottom-right
+static const tex_vertex quad_list[] = {
+    // Triangle 1 — V coords flipped so the texture renders right-side up
+    { QUAD_X0, QUAD_Y1, 0.5f, 0.0f,       QUAD_TEX_V },
+    { QUAD_X1, QUAD_Y1, 0.5f, QUAD_TEX_U, QUAD_TEX_V },
+    { QUAD_X1, QUAD_Y0, 0.5f, QUAD_TEX_U, 1.0f       },
     // Triangle 2
-    { QUAD_X0, QUAD_Y1, 0.5f, 0.0f,      QUAD_TEX_V}, // top-left
-    { QUAD_X1, QUAD_Y0, 0.5f, QUAD_TEX_U,1.0f      }, // bottom-right
-    { QUAD_X0, QUAD_Y0, 0.5f, 0.0f,      1.0f      }, // bottom-left
+    { QUAD_X0, QUAD_Y1, 0.5f, 0.0f,       QUAD_TEX_V },
+    { QUAD_X1, QUAD_Y0, 0.5f, QUAD_TEX_U, 1.0f       },
+    { QUAD_X0, QUAD_Y0, 0.5f, 0.0f,       1.0f       },
 };
 #define quad_list_count 6
 
-// GPU texture and linear staging buffer for back_buffer
 static C3D_Tex back_tex;
-static void*   tex_buf; // linearAlloc'd RGBA8, 512x256
+static void*   tex_buf;
 
-/*ITCM_CODE void ITCM_DC_FlushRange (void *base, u32 size)
-{
-	__asm__ ("\
-	add	r1, r1, r0; \
-	bic	r0, r0, #31; \
-.flush: \
-	mcr	p15, 0, r0, c7, c14, 1; \
-	add	r0, r0, #32; \
-	cmp	r0, r1; \
-	blt	.flush");
-}*/
-
-ITCM_CODE void sync_palette ()
-{
-	/*u16	*s, *dt, *db, *d3d;
-	int	i;
-
-	//vramSetBankF (VRAM_F_LCD);
-	for (i=0, s=ds_palette, dt=palette_top, db=palette_bottom, d3d=palette3d; i<256; i++)
-	{
-		*dt++ = *s;
-		*db++ = *s;
-		*d3d++ = *s++;
-	}
-	palette3d[0] = ds_palette[255];
-	palette3d[255] = ds_palette[0];
-	//vramSetBankF (VRAM_F_TEX_PALETTE);*/
-}
-
-ITCM_CODE void irq_Vblank (void)
-{
-	/*texture_ll_t	*tex;
-
-	if (palette_updated)
-	{
-		sync_palette ();
-		palette_updated = 0;
-	}
-
-	if (texture_ll)
-	{
-		VRAM_CR = VRAM_ENABLE | (VRAM_ENABLE << 8) | (VRAM_ENABLE << 16) | (VRAM_ENABLE << 24);
-
-		for (tex=texture_ll; tex->next; tex=tex->next)
-			dmaCopyWords (3, tex->texture, tex->addr, TEX_SIZE * TEX_SIZE);
-		dmaCopyWordsAsynch (3, tex->texture, tex->addr, TEX_SIZE * TEX_SIZE);
-		tex->next = texture_ll_free;
-		texture_ll_free = texture_ll;
-		texture_ll = NULL;
-
-		VRAM_A_CR = VRAM_ENABLE | VRAM_A_TEXTURE;
-		VRAM_B_CR = VRAM_ENABLE | VRAM_B_TEXTURE;
-		VRAM_C_CR = VRAM_ENABLE | VRAM_C_TEXTURE;
-		VRAM_D_CR = VRAM_ENABLE | VRAM_D_TEXTURE;
-// this doesnt work
-//		VRAM_CR = ((VRAM_ENABLE | VRAM_A_TEXTURE) | ((VRAM_ENABLE | VRAM_B_TEXTURE) << 8) | ((VRAM_ENABLE | VRAM_C_TEXTURE) << 16) | ((VRAM_ENABLE | VRAM_D_TEXTURE) << 24));
-// but this does ?
-//		vramRestoreMainBanks ((VRAM_ENABLE | VRAM_A_TEXTURE) | ((VRAM_ENABLE | VRAM_B_TEXTURE) << 8) | ((VRAM_ENABLE | VRAM_C_TEXTURE) << 16) | ((VRAM_ENABLE | VRAM_D_TEXTURE) << 24));*/
-	//}
-}
-
-bool doSleep;
-
-// Upload a linear RGBA8 buffer into a tiled PICA200 texture using software
-// Morton-code tiling, bypassing GX_DisplayTransfer which produces wrong results
-// for our 512-wide staging buffer.
-//
-// PICA200 tiling: 8x8 pixel base tiles in Z-order (Morton code), tiles
-// themselves arranged row-major across the texture.
-//
-// src_linear : pointer to linearAlloc'd RGBA8 buffer, src_stride u32s per row
-// src_w/h    : pixel region to copy (320x200 for us)
-// tex_w      : full texture width in pixels (512) — used as tile-row stride
+// -----------------------------------------------------------------------------
+// Software Morton-code tiler
+// PICA200 textures use 8x8 tiles in Z-order (Morton interleave), with the
+// tiles themselves laid out row-major across the texture.
+// -----------------------------------------------------------------------------
 static void tex_upload_software(C3D_Tex* tex,
                                 const u32* src_linear, int src_stride,
                                 int src_w, int src_h, int tex_w)
 {
     u32* dst = (u32*)tex->data;
-    int tiles_per_row = tex_w / 8; // 64
+    int tiles_per_row = tex_w / 8;
 
     for (int y = 0; y < src_h; y++) {
         for (int x = 0; x < src_w; x++) {
@@ -203,161 +255,16 @@ static void tex_upload_software(C3D_Tex* tex,
                     ((px & 4) << 2) | ((py & 4) << 3);
             int tile_idx = (y / 8) * tiles_per_row + (x / 8);
             dst[tile_idx * 64 + z] = src_linear[y * src_stride + x];
-            //dst[tile_idx * 64 + z] = src_linear[(255 - y) * src_stride + x];
         }
     }
-    // Flush so GPU sees the freshly-tiled data
     C3D_TexFlush(tex);
 }
 
-void bitblt_to_screen()
-{
-    hidScanInput();
-    keyboard_handler();
-
-    // Convert palette-indexed back_buffer (320x200) to RGBA8 in the staging buffer.
-    // Palette entries are 6-bit (0-63), shift left 2 to get 8-bit (0-252).
-    // GPU_RGBA8 in memory is little-endian 32-bit 0xRRGGBBAA → bytes [A, B, G, R].
-    extern ubyte gr_current_pal[];
-    int x, y;
-    for (y = 0; y < 200 + 56; y++) {
-        const u8* src = back_buffer + y * 320;
-        u32*      dst = (u32*)tex_buf + y * 512;
-        for (x = 0; x < 320; x++) {
-            u8 idx = src[x];
-            u8 r = gr_current_pal[idx*3+0] << 2;
-            u8 g = gr_current_pal[idx*3+1] << 2;
-            u8 b = gr_current_pal[idx*3+2] << 2;
-            // GPU_RGBA8 in little-endian memory: byte[0]=A, [1]=B, [2]=G, [3]=R
-            // As a u32: R<<24 | G<<16 | B<<8 | A
-            dst[x] = ((u32)r << 24) | ((u32)g << 16) | ((u32)b << 8) | 0xFF;
-        }
-    }
-    //
-    // Software-tile tex_buf → back_tex.data (bypasses broken GX_DisplayTransfer)
-    tex_upload_software(&back_tex, (u32*)tex_buf, 512, 320, 200, 512);
-
-    C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
-
-    // Top screen: render the game as a fullscreen quad.
-    C3D_RenderTargetClear(target, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
-    C3D_FrameDrawOn(target);
-    C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLoc_projection, &projection);
-    C3D_TexBind(0, &back_tex);
-    C3D_DrawArrays(GPU_TRIANGLES, 0, quad_list_count);
-
-    C3D_FrameEnd(0);
-}
-
-#ifdef WIFI_DEBUG
-#include <debug_stub.h>
-#include <debug_tcp.h>
-#endif
-
-#ifdef EXCEPT_DEBUG
-static const char *registerNames[] =
-	{	"r0","r1","r2","r3","r4","r5","r6","r7",
-		"r8 ","r9 ","r10","r11","r12","sp ","lr ","pc " };
-
-extern const char __itcm_start[];
-u32 getExceptionAddress( u32 opcodeAddress, u32 thumbState);
-
-void set_error_console ()
-{
-	/*videoSetMode(0);
-	videoSetModeSub(MODE_0_2D | DISPLAY_BG0_ACTIVE);
-	vramSetBankC(VRAM_C_SUB_BG);
-
-	REG_BG0CNT_SUB = BG_MAP_BASE(31);
-
-	BG_PALETTE_SUB[0] = RGB15(31,0,0);
-	BG_PALETTE_SUB[255] = RGB15(31,31,31);
-
-	consoleDemoInit();*/
-}
-//---------------------------------------------------------------------------------
-static void my_handler()
-{
-//---------------------------------------------------------------------------------
-	/*set_error_console ();
-
-	iprintf("\x1b[5CException Occured!\n");
-	u32	currentMode = getCPSR() & 0x1f;
-	u32 thumbState = ((*(u32*)0x027FFD90) & 0x20);
-
-	u32 codeAddress, exceptionAddress = 0;
-
-	int offset = 8;
-
-	if ( currentMode == 0x17 ) {
-		iprintf ("\x1b[10Cdata abort!\n\n");
-		codeAddress = exceptionRegisters[15] - offset;
-		if (	(codeAddress > 0x02000000 && codeAddress < 0x02400000) ||
-				(codeAddress > (u32)__itcm_start && codeAddress < (u32)(__itcm_start + 32768)) )
-			exceptionAddress = getExceptionAddress( codeAddress, thumbState);
-		else
-			exceptionAddress = codeAddress;
-
-	} else {
-		if (thumbState)
-			offset = 2;
-		else
-			offset = 4;
-		iprintf("\x1b[5Cundefined instruction!\n\n");
-		codeAddress = exceptionRegisters[15] - offset;
-		exceptionAddress = codeAddress;
-	}
-
-	iprintf("  pc: %08X addr: %08X\n\n",codeAddress,exceptionAddress);
-
-	int i;
-	for ( i=0; i < 8; i++ ) {
-		iprintf(	"  %s: %08X   %s: %08X\n",
-					registerNames[i], exceptionRegisters[i],
-					registerNames[i+8],exceptionRegisters[i+8]);
-	}
-	iprintf("\n");
-	u32 *stack = (u32 *)exceptionRegisters[13];
-	for ( i=0; i<10; i++ ) {
-		iprintf( "\x1b[%d;2H%08X: %08X %08X", i + 14, (u32)&stack[i*2],stack[i*2], stack[(i*2)+1] );
-	}
-/*	{
-		FILE	*fptr;
-		int	i;
-		u8	j;
-		fptr = fopen ("stack.dmp", "wb");
-		for (i=0; i<0x4000; i++)
-		{
-			j = *(u8 *)(0xb000000 + i);
-			fwrite (&j, 1, 1, fptr);
-		}
-		fclose (fptr);
-	}
-*/	//while(1);
-}
-#endif
-
-void Snd_ParseMessage (u32 msg);
-
-void init_3ds_gpu() 
-{
-	gfxSet3D(false); // 2D bitblt mode - no stereoscopic needed, and having it on without a right-eye target causes black screen
-	C3D_Init(C3D_DEFAULT_CMDBUF_SIZE);
-
-    target = C3D_RenderTargetCreate(240, 400, GPU_RB_RGBA8, GPU_RB_DEPTH24_STENCIL8);
-    C3D_RenderTargetSetOutput(target, GFX_TOP, GFX_LEFT, DISPLAY_TRANSFER_FLAGS);
-
-    sceneInit();
-}
-
-// Frame begin/end are now owned by bitblt_to_screen.
-// These stubs remain for any existing call sites.
-void ds_start_frame() {}
-void ds_end_frame()   {}
-
+// -----------------------------------------------------------------------------
+// Scene setup — shader, attributes, projection, texture, GPU state
+// -----------------------------------------------------------------------------
 void sceneInit(void)
 {
-    // Load shader and bind
     vshader_dvlb = DVLB_ParseFile((u32*)vshader_shbin, vshader_shbin_size);
     shaderProgramInit(&program);
     shaderProgramSetVsh(&program, &vshader_dvlb->DVLE[0]);
@@ -368,622 +275,143 @@ void sceneInit(void)
     // v0 = position (xyz), v1 = texcoord (uv)
     C3D_AttrInfo* attrInfo = C3D_GetAttrInfo();
     AttrInfo_Init(attrInfo);
-    AttrInfo_AddLoader(attrInfo, 0, GPU_FLOAT, 3); // v0=position
-    AttrInfo_AddLoader(attrInfo, 1, GPU_FLOAT, 2); // v1=texcoord
+    AttrInfo_AddLoader(attrInfo, 0, GPU_FLOAT, 3);
+    AttrInfo_AddLoader(attrInfo, 1, GPU_FLOAT, 2);
 
-    // Orthographic projection matching screen space (0-400 x, 0-240 y)
-    //Mtx_OrthoTilt(&projection, 0.0, 400.0, 0.0, 240.0, 0.0, 1.0, true);
-    Mtx_OrthoTilt(&projection, 0.0, 400.0, 240.0, 0.0, 0.0, 1.0, true);
+    Mtx_OrthoTilt(&projection, 0.0f, SCREEN_W, SCREEN_H, 0.0f, 0.0f, 1.0f, true);
 
-    // Upload quad vertices to GPU-accessible memory
     vbo_data = linearAlloc(sizeof(quad_list));
     memcpy(vbo_data, quad_list, sizeof(quad_list));
 
     C3D_BufInfo* bufInfo = C3D_GetBufInfo();
     BufInfo_Init(bufInfo);
-    BufInfo_Add(bufInfo, vbo_data, sizeof(vertex), 2, 0x10); // 2 attribs: v0, v1
+    BufInfo_Add(bufInfo, vbo_data, sizeof(tex_vertex), 2, 0x10);
 
-    // Allocate the GPU texture (512x256 RGBA8) and a linear staging buffer
-    C3D_TexInit(&back_tex, 512, 256, GPU_RGBA8);
+    C3D_TexInit(&back_tex, TEX_W, TEX_H, GPU_RGBA8);
     C3D_TexSetFilter(&back_tex, GPU_LINEAR, GPU_LINEAR);
-    tex_buf = linearAlloc(512 * 256 * 4);
-    memset(tex_buf, 0, 512 * 256 * 4);
+    C3D_TexSetWrap(&back_tex, GPU_CLAMP_TO_EDGE, GPU_CLAMP_TO_EDGE);
 
-    // Disable face culling - winding order after OrthoTilt can be ambiguous
+    tex_buf = linearAlloc(TEX_W * TEX_H * 4);
+    memset(tex_buf, 0, TEX_W * TEX_H * 4);
+
+    // Explicit GPU state — emulators tolerate garbage defaults, hardware does not
     C3D_CullFace(GPU_CULL_NONE);
+    C3D_DepthTest(false, GPU_ALWAYS, GPU_WRITE_ALL);
 
-    // Fragment stage: sample from texture unit 0
+    // Standard alpha blending: src * src.a + dst * (1 - src.a).
+    // Enables palette-index-0 transparency from the conversion loop.
+    C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD,
+                   GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA,
+                   GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA);
+    C3D_AlphaTest(false, GPU_ALWAYS, 0);
+
+    // Fragment stage: output the sampled texture color directly
     C3D_TexEnv* env = C3D_GetTexEnv(0);
     C3D_TexEnvInit(env);
     C3D_TexEnvSrc(env, C3D_Both, GPU_TEXTURE0, 0, 0);
     C3D_TexEnvFunc(env, C3D_Both, GPU_REPLACE);
-
-    // C3D_TexEnv* env = C3D_GetTexEnv(0);
-    // C3D_TexEnvInit(env);
-    // C3D_TexEnvColor(env, 0xFF0000FF); // solid red RGBA
-    // C3D_TexEnvSrc(env, C3D_Both, GPU_CONSTANT, 0, 0);
-    // C3D_TexEnvFunc(env, C3D_Both, GPU_REPLACE);
 }
 
-ITCM_CODE void irq_arm9_fifo (void)
+// -----------------------------------------------------------------------------
+// Main present function — called every frame by the game
+// -----------------------------------------------------------------------------
+void bitblt_to_screen(void)
 {
-	/*while ( !(REG_IPC_FIFO_CR & IPC_FIFO_RECV_EMPTY))
-	{
-		u32 value = REG_IPC_FIFO_RX;
-		u32 msg = value & 0xffffff;
-		switch (value >> 24)
-		{
-		case 0x01:	// Sound Message
-			//Snd_ParseMessage (msg);
-			break;
+    hidScanInput();
+    keyboard_handler();
 
-		case 0x02:	// Sleep
-			doSleep = msg >> 8 & 0xff;
-			break;
-		}
-	}*/
-}
-
-void nds_init ()
-{
-	/*softkey_create_keyboards ();
-
-	powerOn (POWER_ALL);
-
-	irqSet (IRQ_VBLANK, (irq_func_t)irq_Vblank);
-	videoSetMode (MODE_5_3D | DISPLAY_BG3_ACTIVE);
-	vramSetBankA (VRAM_A_TEXTURE);
-	vramSetBankB (VRAM_B_TEXTURE);
-	vramSetBankC (VRAM_C_TEXTURE);
-	vramSetBankD (VRAM_D_TEXTURE);
-	vramSetBankE (VRAM_E_MAIN_BG);
-	vramSetBankF (VRAM_F_TEX_PALETTE);
-	REG_BG0CNT = BG_PRIORITY_1;
-	REG_BG3CNT = BG_BMP8_256x256 | BG_PRIORITY_0;
-	REG_BG3PA = 1 << 8;
-	REG_BG3PB = 0;
-	REG_BG3PC = 0;
-	REG_BG3PD = 1 << 8;
-	REG_BG3X = 0;
-	REG_BG3Y = 0;
-
-#ifdef CONSOLE
-	videoSetModeSub (MODE_0_2D | DISPLAY_BG0_ACTIVE);
-	vramSetBankH (VRAM_H_SUB_BG);
-	vramSetBankI (VRAM_I_SUB_BG_0x06208000);
-	REG_BG0CNT_SUB = BG_MAP_BASE (31);
-	BG_PALETTE_SUB[255] = RGB15 (31, 31, 31);
-	consoleDemoInit ();
-#else
-	videoSetModeSub (MODE_5_2D | DISPLAY_BG3_ACTIVE);
-	vramSetBankH (VRAM_H_SUB_BG);
-	vramSetBankI (VRAM_I_SUB_BG_0x06208000);
-	REG_BG3CNT_SUB = BG_BMP8_256x256;
-	REG_BG3PA_SUB = 1 << 8;
-	REG_BG3PB_SUB = 0;
-	REG_BG3PC_SUB = 0;
-	REG_BG3PD_SUB = 1 << 8;
-	REG_BG3X_SUB = 0;
-	REG_BG3Y_SUB = 0;
-	consoleDebugInit(DebugDevice_NOCASH);
+    // --- Populate the staging buffer based on render mode ---
+#if RENDER_MODE == RENDER_MODE_BITBLT
+    // Convert palette-indexed back_buffer to RGBA8. Palette indices are 6-bit
+    // (0..63), so shift left by 2 to get 8-bit values.
+    // Palette index 0 is treated as transparent (alpha = 0).
+    extern ubyte gr_current_pal[];
+    for (int y = 0; y < UPLOAD_H; y++) {
+        const u8* src = back_buffer + y * 320;
+        u32*      dst = (u32*)tex_buf + y * TEX_W;
+        for (int x = 0; x < 320; x++) {
+            u8 idx = src[x];
+            u8 r = gr_current_pal[idx * 3 + 0] << 2;
+            u8 g = gr_current_pal[idx * 3 + 1] << 2;
+            u8 b = gr_current_pal[idx * 3 + 2] << 2;
+            u8 a = (idx == 0) ? 0x00 : 0xFF;
+            dst[x] = ((u32)r << 24) | ((u32)g << 16) | ((u32)b << 8) | a;
+        }
+    }
+#elif RENDER_MODE == RENDER_MODE_SOLID
+    u32* p = (u32*)tex_buf;
+    for (int i = 0; i < TEX_W * TEX_H; i++) p[i] = 0xFF0000FF;
+#elif RENDER_MODE == RENDER_MODE_CHECKERBOARD
+    u32* p = (u32*)tex_buf;
+    for (int y = 0; y < UPLOAD_H; y++) {
+        for (int x = 0; x < GAME_W; x++) {
+            int cell = ((x / 32) ^ (y / 32)) & 1;
+            p[y * TEX_W + x] = cell ? 0xFF0000FF : 0xFFFFFFFF;
+        }
+    }
+#elif RENDER_MODE == RENDER_MODE_RAW_WRITE
+    // Bypasses the tiler entirely — writes directly to tex->data.
+    u32* raw = (u32*)back_tex.data;
+    for (int i = 0; i < TEX_W * TEX_H; i++) raw[i] = 0xFF0000FF;
+    C3D_TexFlush(&back_tex);
 #endif
 
-	defaultExceptionHandler();
-
-	glInit ();
-
-	glEnable (GL_TEXTURE_2D);
-	glEnable (GL_BLEND);
-
-	glViewport (0, 0, 255, 191);
-	glClearColor (0, 0, 0, 31);
-	glClearPolyID (63);
-	glClearDepth (0x7FFF);
-
-	glPolyFmt (POLY_ALPHA (31) | POLY_CULL_BACK);
-
-	glMatrixMode (GL_PROJECTION);
-	glLoadIdentity ();
-	gluPerspective (35, 1.0, 1.0, 5000);
-
-	glMatrixMode (GL_TEXTURE);
-	glLoadIdentity ();
-
-	glMatrixMode (GL_MODELVIEW);
-	glLoadIdentity ();
-	MATRIX_SCALE = 1048576;
-	MATRIX_SCALE = 1048576;
-	MATRIX_SCALE = -1048576;
-
-	glColor (0x7fff);
-
-	glColorTable (GL_RGB256, 0);
-
-#ifdef WIFI_DEBUG
-	{
-		struct tcp_debug_comms_init_data init_data = {
-			.port = 30000
-		};
-		if (!init_debug (&tcpCommsIf_debug, &init_data))
-		{
-			printf ("Failed to initialise the debugger stub - cannot continue\n");
-			while (1) ;
-		}
-		debugHalt ();
-	}
+    // --- Upload to GPU (unless we're testing raw writes) ---
+#if RENDER_MODE != RENDER_MODE_RAW_WRITE
+    tex_upload_software(&back_tex, (u32*)tex_buf, TEX_W, GAME_W, UPLOAD_H, TEX_W);
 #endif
 
-	if (!fatInitDefault ())
-		Error ("fatInitDefault () failed");
-	chdir("/dscent");
-	init_nds_textures ();
-
-#ifdef EXCEPT_DEBUG
-	setExceptionHandler (my_handler) ;
-#endif
-   */
+    // --- Render ---
+    C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+    C3D_RenderTargetClear(target, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
+    C3D_FrameDrawOn(target);
+    C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLoc_projection, &projection);
+    C3D_TexBind(0, &back_tex);
+    C3D_DrawArrays(GPU_TRIANGLES, 0, quad_list_count);
+    C3D_FrameEnd(0);
 }
 
-// sorta hack to support the cloaked effect
-//extern void draw_tmap_flat(grs_bitmap *bp,int nverts,g3s_point **vertbuf);
-/*
-void g3_set_special_render(void (*tmap_drawer)(grs_bitmap *bm,int nv,g3s_point **vertlist),
-						   void (*flat_drawer)(int nv,fix *vertlist),
-						   int (*line_drawer)(fix x0,fix y0,fix x1,fix y1))
+#endif // RENDER_MODE branch
+
+// =============================================================================
+// GPU bring-up — called once at startup
+// =============================================================================
+void init_3ds_gpu(void)
 {
-	if (tmap_drawer == 1)
-	{
-//		g3_draw_tmap_func = (g3_draw_tmap_func_t) g3_draw_tmap_flat;
-		glPolyFmt (POLY_ALPHA (31 - Gr_scanline_darkening_level) | POLY_CULL_NONE);
-	}
-	else
-	{
-//		g3_draw_tmap_func = (g3_draw_tmap_func_t) g3_draw_tmap;
-		glPolyFmt (POLY_ALPHA (31) | POLY_CULL_BACK);
-	}
-}
-*/
-void nds_set_render_size (int x, int y, int w, int h)
-{
-	//glViewport (x, y, x + w, y + h);
+    gfxSet3D(false); // 2D mode — stereo without a right-eye target blanks the screen
+    C3D_Init(C3D_DEFAULT_CMDBUF_SIZE);
+
+    target = C3D_RenderTargetCreate(SCREEN_H, SCREEN_W,
+                                    GPU_RB_RGBA8, GPU_RB_DEPTH24_STENCIL8);
+    C3D_RenderTargetSetOutput(target, GFX_TOP, GFX_LEFT, DISPLAY_TRANSFER_FLAGS);
+
+    sceneInit();
 }
 
-typedef struct
-{
-	int	last_frame_used;
-	int	key;
-	u32	format;
-	grs_bitmap	*bm;
-} gltexture_t;
-
-gltexture_t	gl_textures[MAX_GL_TEXTURES];
-
-u32	*next_tex_addr = (u32 *)0x06800000;
-int	last_bound_key = -1;
-
-void init_nds_textures (void)
-{
-	/*int	i;
-
-	next_tex_addr = (u32 *)0x06800000;
-
-	for (i=0; i<MAX_GL_TEXTURES; i++)
-	{
-		gl_textures[i].last_frame_used = -1;
-		gl_textures[i].key = -1;
-		gl_textures[i].format = 0;
-		gl_textures[i].bm = NULL;
-	}
-
-	texture_ll = NULL;
-	texture_ll_free = &texture_ll_pool[0];
-	texture_ll_pool[0].texture = textures[0];
-	for (i=1; i<MAX_TEX_BUFFER; i++)
-	{
-		texture_ll_pool[i - 1].next = &texture_ll_pool[i];
-		texture_ll_pool[i].texture = textures[i];
-	}
-	texture_ll_pool[MAX_TEX_BUFFER - 1].next = NULL;*/
-}
-
-void scale_inbitmap(grs_bitmap *dst, grs_bitmap *src );
-void gr_bm_ubitblt_rle(int w, int h, int dx, int dy, int sx, int sy, grs_bitmap * src, grs_bitmap * dest);
-
-int find_bitmap_in_vram (int key)
-{
-	/*int	i;
-
-	for (i=0; i<MAX_GL_TEXTURES; i++)
-	{
-		if (gl_textures[i].key == key)
-			return i;
-	}
-
-	return -1;*/
-}
-
-ITCM_CODE void bind_texture (grs_bitmap *bmp)
-{
-	unsigned char	*data, *in;
-	grs_bitmap		full;
-	gltexture_t		*gltex;
-	texture_ll_t	*tex;
-	int	i;
-	int	least_recently_used, lowest_frame_count;
-	u32	*addr;
-/*
-	if (bmp->key == -1)
-	{
-		printf ("will not bind unkeyd texture\n");
-		return;
-	}
-*/
-	/*if (bmp->texname != -1 && gl_textures[bmp->texname].key == bmp->key)
-	{
-		gltex = &gl_textures[bmp->texname];
-		gltex->last_frame_used = FrameCount;
-		if (bmp->bm_flags & BM_FLAG_FORCE_REFRESH)
-			goto refresh;
-		GFX_TEX_FORMAT = gltex->format;
-		return;
-	}
-
-	lowest_frame_count = gl_textures[0].last_frame_used;
-	least_recently_used = 0;
-
-	for (i=0, gltex=gl_textures; i<MAX_GL_TEXTURES; i++, gltex++)
-	{
-		if (gltex->key == bmp->key)
-		{
-			bmp->texname = i;
-			GFX_TEX_FORMAT = gltex->format;
-			gltex->last_frame_used = FrameCount;
-			gltex->bm = bmp;
-			return;
-		}
-		if (lowest_frame_count > gltex->last_frame_used)
-		{
-			lowest_frame_count = gltex->last_frame_used;
-			least_recently_used = i;
-		}
-	}
-
-	gltex = &gl_textures[least_recently_used];
-	gltex->key = bmp->key;
-	gltex->last_frame_used = FrameCount;
-	if (gltex->bm)
-		gltex->bm->bm_flags &= ~BM_FLAG_IN_VRAM;
-	gltex->bm = NULL;
-	bmp->texname = least_recently_used;
-refresh:
-	if (bmp->bm_flags & BM_FLAG_PAGED_OUT)
-	{
-		bitmap_index	idx;
-		bmp->texname = -1;
-		idx.index = bmp->key;
-		bmp->bm_flags &= ~BM_FLAG_IN_VRAM;
-		piggy_bitmap_page_in (idx);
-	}
-
-	if (!texture_ll_free)
-	{
-//		printf ("maximum buffered textured reached, skipping\n");
-		return;
-	}
-	tex = texture_ll_free;
-	texture_ll_free = texture_ll_free->next;
-	data = tex->texture;
-
-	full.bm_w = TEX_SIZE;
-	full.bm_h = TEX_SIZE;
-	full.bm_data = data;
-	full.bm_rowsize = TEX_SIZE;
-
-	if (bmp->bm_w != TEX_SIZE || bmp->bm_h != TEX_SIZE)
-	{
-		memset (data, 255, TEX_SIZE * TEX_SIZE);
-		scale_inbitmap (&full, bmp);
-		goto switch_transparency;
-	}
-	else if (bmp->bm_flags & BM_FLAG_RLE)
-	{
-		gr_bm_ubitblt_rle (bmp->bm_w, bmp->bm_h, 0, 0, 0, 0, bmp, &full);
-		goto switch_transparency;
-	}
-	else
-	{
-		in = bmp->bm_data;
-		for (i=0; i<TEX_SIZE * TEX_SIZE; i++, in++, data++)
-		{
-			if (*in == 255)
-				*data = 0;
-			else if (*in == 0)
-				*data = 255;
-			else
-				*data = *in;
-		}
-		goto moveon;
-	}
-switch_transparency:
-	for (i=0, in=data; i<TEX_SIZE * TEX_SIZE; i++, in++)
-	{
-		if (*in == 255)
-			*in = 0;
-		else if (*in == 0)
-			*in = 255;
-	}
-moveon:
-	DC_FlushRange (data, TEX_SIZE * TEX_SIZE);
-	if (!(bmp->bm_flags & BM_FLAG_NO_PAGE_OUT))
-	{
-		free (bmp->bm_data);
-		bmp->bm_data = NULL;
-		bmp->bm_flags |= BM_FLAG_PAGED_OUT | BM_FLAG_IN_VRAM;
-		gltex->bm = bmp;
-	}
-
-	if (gltex->format == 0)
-	{
-		addr = next_tex_addr;
-		next_tex_addr += (TEX_SIZE * TEX_SIZE) >> 2;
-	}
-	else
-	{
-		addr = (u32 *)(((gltex->format & 0xffff) << 3) + 0x6800000);
-	}
-
-	if (bmp->bm_flags & BM_FLAG_TRANSPARENT)
-		gltex->format = (GL_TEXTURE_WRAP_S | GL_TEXTURE_WRAP_T | GL_TEXTURE_COLOR0_TRANSPARENT) | (MY_TEXTURE_SIZE << 20) | (MY_TEXTURE_SIZE << 23) | (((uint32)addr >> 3) & 0xFFFF) | (GL_RGB256 << 26);
-	else
-		gltex->format = (GL_TEXTURE_WRAP_S | GL_TEXTURE_WRAP_T) | (MY_TEXTURE_SIZE << 20) | (MY_TEXTURE_SIZE << 23) | (((uint32)addr >> 3) & 0xFFFF) | (GL_RGB256 << 26);
-
-	GFX_TEX_FORMAT = gltex->format;
-	tex->addr = addr;
-	tex->next = texture_ll;
-	texture_ll = tex;*/
-}
-
-#define do_vertex_color(n) \
-	light = uvl_list[(n)].l * NUM_LIGHTING_LEVELS; \
-	if (light < (F1_0 / 2))	light = (F1_0 / 2); \
-	if (light > MAX_LIGHTING_VALUE * NUM_LIGHTING_LEVELS) light = MAX_LIGHTING_VALUE * NUM_LIGHTING_LEVELS; \
-	color = gr_fade_table[((light >> 8) & 0xff00) + 48]; \
-	GFX_COLOR = ds_palette[color];
-
-// Remove 6 bits of precision
-#define do_vertex_tex_coord(n) \
-	GFX_TEX_COORD = TEXTURE_PACK(uvl_list[(n)].u >> 6, uvl_list[(n)].v >> 6);
-
-#define do_vertex(n) \
-	do_vertex_coord ((n));
-
-#define do_tex_vertex(n) \
-	do_vertex_tex_coord ((n)); \
-	do_vertex_coord ((n));
-
-#define do_tex_lit_vertex(n) \
-	do_vertex_color ((n)); \
-	do_vertex_tex_coord ((n)); \
-	do_vertex_coord ((n));
-
-#define check_and_bind_texture(bm) \
-	if (bm->key != last_bound_key) \
-	{ \
-		last_bound_key = bm->key; \
-		bind_texture (bm); \
-	}
-
-g3_draw_tmap_func_t	g3_draw_tmap_func = (g3_draw_tmap_func_t)g3_draw_tmap_tex;
-
-// Remove 12 bits of precision
-#define do_vertex_coord(n) \
-	GFX_VERTEX16 = VERTEX_PACK(pointlist[(n)]->x >> 12, pointlist[(n)]->y >> 12); \
-	GFX_VERTEX16 = (pointlist[(n)]->z >> 12) & 0xffff;
-
-ITCM_CODE void g3_draw_poly (int nv, vms_vector **pointlist)
-{
-	/*int	i;
-
-	GFX_TEX_FORMAT = 0;
-	last_bound_key = -1;
-	GFX_COLOR = ds_palette[COLOR];
-	if (nv == 3)
-	{
-		GFX_BEGIN = GL_TRIANGLES;
-		do_vertex (2);
-		do_vertex (1);
-		do_vertex (0);
-	}
-	else if (nv == 4)
-	{
-		GFX_BEGIN = GL_QUADS;
-		do_vertex (3);
-		do_vertex (2);
-		do_vertex (1);
-		do_vertex (0);
-	}
-	else
-	{
-		GFX_BEGIN = GL_TRIANGLES;
-		do_vertex (2);
-		do_vertex (1);
-		do_vertex (0);
-		for (i=2; i<nv-1; i++)
-		{
-			do_vertex (i + 1);
-			do_vertex (i);
-			do_vertex (0);
-		}
-	}
-	GFX_END = 0;*/
-}
-
-ITCM_CODE void g3_draw_tmap_flat (int nv, vms_vector **pointlist, g3s_uvl *uvl_list, grs_bitmap *bm)
-{
-	/*int	color, i;
-	fix	average_light;
-
-	GFX_TEX_FORMAT = 0;
-	last_bound_key = -1;
-
-	average_light = uvl_list[0].l;
-	for (i=1; i<nv; i++)
-		average_light += uvl_list[i].l;
-
-	if (nv == 4)
-		average_light = f2i (average_light * NUM_LIGHTING_LEVELS / 4);
-	else
-		average_light = f2i (average_light * NUM_LIGHTING_LEVELS / nv);
-
-	if (average_light < 0)
-		average_light = 0;
-	else if (average_light > NUM_LIGHTING_LEVELS - 1)
-		average_light = NUM_LIGHTING_LEVELS - 1;
-
-	color = gr_fade_table[average_light * 256 + bm->avg_color];
-
-	GFX_COLOR = ds_palette[color];
-	if (nv == 3)
-	{
-		GFX_BEGIN = GL_TRIANGLES;
-		do_vertex (2);
-		do_vertex (1);
-		do_vertex (0);
-	}
-	else if (nv == 4)
-	{
-		GFX_BEGIN = GL_QUADS;
-		do_vertex (3);
-		do_vertex (2);
-		do_vertex (1);
-		do_vertex (0);
-	}
-	else
-	{
-		GFX_BEGIN = GL_TRIANGLES;
-		do_vertex (2);
-		do_vertex (1);
-		do_vertex (0);
-		for (i=2; i<nv-1; i++)
-		{
-			do_vertex (i + 1);
-			do_vertex (i);
-			do_vertex (0);
-		}
-	}
-	GFX_END = 0;*/
-}
-
-ITCM_CODE void g3_draw_tmap_tex (int nv, vms_vector **pointlist, g3s_uvl *uvl_list, grs_bitmap *bm)
-{
-	/*int	i;
-
-	check_and_bind_texture (bm);
-
-	if (!(bm->bm_flags & BM_FLAG_NO_LIGHTING) && Lighting_on)
-	{
-		u8	color;
-		s32	light;
-		if (nv == 3)
-		{
-			GFX_BEGIN = GL_TRIANGLES;
-			do_tex_lit_vertex (2);
-			do_tex_lit_vertex (1);
-			do_tex_lit_vertex (0);
-		}
-		else if (nv == 4)
-		{
-			GFX_BEGIN = GL_QUADS;
-			do_tex_lit_vertex (3);
-			do_tex_lit_vertex (2);
-			do_tex_lit_vertex (1);
-			do_tex_lit_vertex (0);
-		}
-		else
-		{
-			GFX_BEGIN = GL_TRIANGLES;
-			do_tex_lit_vertex (2);
-			do_tex_lit_vertex (1);
-			do_tex_lit_vertex (0);
-			for (i=2; i<nv-1; i++)
-			{
-				do_tex_lit_vertex (i + 1);
-				do_tex_lit_vertex (i);
-				do_tex_lit_vertex (0);
-			}
-		}
-		GFX_END = 0;
-	}
-	else
-	{
-		GFX_COLOR = 0x7fff;
-		if (nv == 3)
-		{
-			GFX_BEGIN = GL_TRIANGLES;
-			do_tex_vertex (2);
-			do_tex_vertex (1);
-			do_tex_vertex (0);
-		}
-		else if (nv == 4)
-		{
-			GFX_BEGIN = GL_QUADS;
-			do_tex_vertex (3);
-			do_tex_vertex (2);
-			do_tex_vertex (1);
-			do_tex_vertex (0);
-		}
-		else
-		{
-			GFX_BEGIN = GL_TRIANGLES;
-			do_tex_vertex (2);
-			do_tex_vertex (1);
-			do_tex_vertex (0);
-			for (i=2; i<nv-1; i++)
-			{
-				do_tex_vertex (i + 1);
-				do_tex_vertex (i);
-				do_tex_vertex (0);
-			}
-		}
-		GFX_END = 0;
-	}*/
-}
-
-ITCM_CODE void g3_draw_bitmap (vms_vector *pos,fix width,fix height,grs_bitmap *bm)
-{
-	/*g3s_point	pnt;
-	fix			x1, x2, y1, y2, z;
-	fix			u1, u2, v1, v2;
-
-	if (g3_rotate_point (&pnt, pos) & CC_BEHIND)
-		return;
-
-	x1 = (pnt.p3_x - width) >> 12;
-	x2 = (pnt.p3_x + width) >> 12;
-	y1 = (pnt.p3_y - height) >> 12;
-	y2 = (pnt.p3_y + height) >> 12;
-	z  = (pnt.p3_z >> 12) & 0xffff;
-
-	u1 = v1 = 0;
-	u2 = v2 = 63 << 4;
-
-	check_and_bind_texture (bm);
-
-	GFX_COLOR = 0x7fff;
-	GFX_BEGIN = GL_QUADS;
-	GFX_TEX_COORD = TEXTURE_PACK (u1, v2);
-	GFX_VERTEX16 = VERTEX_PACK (x1, y1);
-	GFX_VERTEX16 = z;
-
-	GFX_TEX_COORD = TEXTURE_PACK (u2, v2);
-	GFX_VERTEX16 = VERTEX_PACK (x2, y1);
-	GFX_VERTEX16 = z;
-	GFX_TEX_COORD = TEXTURE_PACK (u2, v1);
-	GFX_VERTEX16 = VERTEX_PACK (x2, y2);
-	GFX_VERTEX16 = z;
-
-	GFX_TEX_COORD = TEXTURE_PACK (u1, v1);
-	GFX_VERTEX16 = VERTEX_PACK (x1, y2);
-	GFX_VERTEX16 = z;
-	GFX_END = 0;*/
-}
+// =============================================================================
+// Debug modes reference
+// =============================================================================
+// To switch modes, change RENDER_MODE at the top of this file and (if switching
+// between TRIANGLE and everything else) swap the vertex shader source.
+//
+//   BITBLT        — Normal gameplay rendering. Palette -> RGBA -> tiled texture -> quad.
+//                   Uses position+texcoord shader.
+//
+//   TRIANGLE      — Minimal GPU test. Draws a colored triangle with no textures.
+//                   Uses position+color shader (vshader_triangle.v.pica).
+//                   If this fails, the pipeline (shader, render target, projection)
+//                   is fundamentally broken.
+//
+//   SOLID         — Fills the staging buffer with solid red, then runs the full
+//                   texture pipeline. If this works but BITBLT doesn't, the bug
+//                   is in the palette conversion. If this fails but TRIANGLE
+//                   works, the bug is in the texture upload path.
+//
+//   CHECKERBOARD  — 32x32 red/white checker. Same diagnostic purpose as SOLID
+//                   but makes tiling bugs visually obvious (scrambled blocks).
+//
+//   RAW_WRITE     — Bypasses the software tiler entirely and writes directly
+//                   into back_tex.data. If this works but SOLID doesn't, the
+//                   tiler is broken. If both fail, something between tex->data
+//                   and the GPU sampler is broken (state, binding, or memory).
+// =============================================================================
