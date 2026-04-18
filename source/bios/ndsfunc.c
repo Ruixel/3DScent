@@ -493,8 +493,10 @@ static void world_init(void)
     world_projection = tmp;
 #endif
 
-    // Precompute focal length and viewport mapping (wireframe only)
-    //float fov_rad = WIRE_FOV_DEG * (float)M_PI / 180.0f;
+#if WORLD_MODE == WORLD_MODE_WIREFRAME
+    // Precompute focal length and viewport mapping (wireframe only — uses
+    // CPU-side projection in world_project)
+    float fov_rad = WIRE_FOV_DEG * (float)M_PI / 180.0f;
     world_focal      = 1.0f / tanf(fov_rad * 0.5f);
     world_aspect_inv = (float)GAME_H / (float)GAME_W;
 
@@ -502,6 +504,7 @@ static void world_init(void)
     world_half_h   = (QUAD_Y1 - QUAD_Y0) * 0.5f;
     world_center_x = (QUAD_X0 + QUAD_X1) * 0.5f;
     world_center_y = (QUAD_Y0 + QUAD_Y1) * 0.5f;
+#endif
 
     world_vbo = linearAlloc(sizeof(world_vertex) * WIRE_MAX_VERTS);
     world_vbo_count = 0;
@@ -701,26 +704,65 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
     // Convert camera-space fixed-point to float. The GPU vertex shader will
     // apply our perspective projection matrix, doing the perspective divide
     // and producing perspective-correct UV interpolation as a side effect.
-    float cx[WORLD_MAX_POLY_VERTS], cy[WORLD_MAX_POLY_VERTS], cz[WORLD_MAX_POLY_VERTS];
-    float u [WORLD_MAX_POLY_VERTS], v [WORLD_MAX_POLY_VERTS];
+    float in_cx[WORLD_MAX_POLY_VERTS], in_cy[WORLD_MAX_POLY_VERTS], in_cz[WORLD_MAX_POLY_VERTS];
+    float in_u [WORLD_MAX_POLY_VERTS], in_v [WORLD_MAX_POLY_VERTS];
 
     for (int i = 0; i < nv; i++) {
-        cx[i] = (float)pointlist[i]->x * (1.0f / 65536.0f);
-        cy[i] = (float)pointlist[i]->y * (1.0f / 65536.0f);
-        cz[i] = (float)pointlist[i]->z * (1.0f / 65536.0f);
+        in_cx[i] = (float)pointlist[i]->x * (1.0f / 65536.0f);
+        in_cy[i] = (float)pointlist[i]->y * (1.0f / 65536.0f);
+        in_cz[i] = (float)pointlist[i]->z * (1.0f / 65536.0f);
         // UVs: Descent stores as 16.16 fix where 1.0 = full texture.
         // Scale by u_scale/v_scale to handle non-POT padding.
-        u[i] = (float)uvl_list[i].u * (1.0f / 65536.0f) * gt->u_scale;
-        v[i] = (float)uvl_list[i].v * (1.0f / 65536.0f) * gt->v_scale;
+        in_u[i] = (float)uvl_list[i].u * (1.0f / 65536.0f) * gt->u_scale;
+        in_v[i] = (float)uvl_list[i].v * (1.0f / 65536.0f) * gt->v_scale;
     }
 
-    // If any vertex is behind the camera, skip the whole poly for now.
-    // Proper near-plane clipping is a Phase 2+ thing.
+    // -------------------------------------------------------------------------
+    // Near-plane clipping (Sutherland-Hodgman).
+    // For each edge (curr -> next):
+    //   - If both vertices are in front of the near plane, keep `next`.
+    //   - If only `curr` is in front, emit the edge/plane intersection.
+    //   - If only `next` is in front, emit intersection then `next`.
+    //   - If both are behind, drop both.
+    // Output may have up to nv+1 vertices (each behind-to-front transition
+    // adds one). We size the output buffer accordingly.
+    // -------------------------------------------------------------------------
+    #define CLIP_MAX_OUT (WORLD_MAX_POLY_VERTS + 2)
+    float cx[CLIP_MAX_OUT], cy[CLIP_MAX_OUT], cz[CLIP_MAX_OUT];
+    float u [CLIP_MAX_OUT], v [CLIP_MAX_OUT];
+    int out_nv = 0;
+
     for (int i = 0; i < nv; i++) {
-        if (cz[i] < WIRE_NEAR) return;
+        int j = (i + 1) % nv;
+        bool curr_in = in_cz[i] >= WIRE_NEAR;
+        bool next_in = in_cz[j] >= WIRE_NEAR;
+
+        if (curr_in) {
+            // Always keep current vertex if it's in front
+            cx[out_nv] = in_cx[i]; cy[out_nv] = in_cy[i]; cz[out_nv] = in_cz[i];
+            u[out_nv]  = in_u[i];  v[out_nv]  = in_v[i];
+            out_nv++;
+        }
+        if (curr_in != next_in) {
+            // Edge crosses the near plane — compute intersection
+            // Parametric form: P(t) = curr + t * (next - curr), 0 <= t <= 1
+            // Solve for t where P.z = WIRE_NEAR:
+            //   curr.z + t * (next.z - curr.z) = WIRE_NEAR
+            //   t = (WIRE_NEAR - curr.z) / (next.z - curr.z)
+            float t = (WIRE_NEAR - in_cz[i]) / (in_cz[j] - in_cz[i]);
+            cx[out_nv] = in_cx[i] + t * (in_cx[j] - in_cx[i]);
+            cy[out_nv] = in_cy[i] + t * (in_cy[j] - in_cy[i]);
+            cz[out_nv] = WIRE_NEAR;
+            u[out_nv]  = in_u[i]  + t * (in_u[j]  - in_u[i]);
+            v[out_nv]  = in_v[i]  + t * (in_v[j]  - in_v[i]);
+            out_nv++;
+        }
     }
 
-    int needed = (nv - 2) * 3;
+    // If clipping eliminated everything, skip
+    if (out_nv < 3) return;
+
+    int needed = (out_nv - 2) * 3;
     if (world_vbo_count + needed > WIRE_MAX_VERTS) return;
 
     // Get/create a batch for this texture. If the previous draw used the
@@ -738,8 +780,8 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
         world_last_tex = gt->tex;
     }
 
-    // Fan triangulation: (v0, v1, v2), (v0, v2, v3), (v0, v3, v4), ...
-    for (int i = 1; i < nv - 1; i++) {
+    // Fan triangulation of the clipped polygon
+    for (int i = 1; i < out_nv - 1; i++) {
         world_emit_vert(cx[0],   cy[0],   cz[0],   u[0],   v[0]);
         world_emit_vert(cx[i],   cy[i],   cz[i],   u[i],   v[i]);
         world_emit_vert(cx[i+1], cy[i+1], cz[i+1], u[i+1], v[i+1]);
