@@ -13,6 +13,7 @@
 // =============================================================================
 
 #include <malloc.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -32,6 +33,7 @@
 #include "ndsfunc.h"
 #include "softkey.h"
 #include "vshader_shbin.h"
+#include "vshader_wire_shbin.h"
 
 // -----------------------------------------------------------------------------
 // Render mode selection
@@ -74,10 +76,29 @@ static void*             vbo_data;
 #define SCREEN_W  400
 #define SCREEN_H  240
 
+// -----------------------------------------------------------------------------
+// Game screen dimensions and the on-screen quad region.
+// Hoisted here (above the render-mode switch) because the wireframe overlay
+// needs these values regardless of mode.
+// -----------------------------------------------------------------------------
+#define TEX_W     512   // PICA200 requires power-of-two textures
+#define TEX_H     256
+#define GAME_W    320   // Game's native back_buffer width
+#define GAME_H    200   // Game's native back_buffer height
+#define UPLOAD_H  256   // Rows we actually upload (must cover the UV sample range)
+
+#define QUAD_X_MARGIN  40.0f
+#define QUAD_Y_MARGIN  20.0f
+#define QUAD_X0        QUAD_X_MARGIN
+#define QUAD_X1        (SCREEN_W - QUAD_X_MARGIN)
+#define QUAD_Y0        QUAD_Y_MARGIN
+#define QUAD_Y1        (SCREEN_H - QUAD_Y_MARGIN)
+#define QUAD_TEX_U     ((float)GAME_W / (float)TEX_W)
+#define QUAD_TEX_V     (56.0f / (float)TEX_H)
+
 // Clear to black for gameplay. Swap to 0x68B0D8FF if you want a visible
 // background behind transparent (palette-index-0) pixels during testing.
-//#define CLEAR_COLOR  0x000000FF
-#define CLEAR_COLOR 0x68B0D8FF  // light blue
+#define CLEAR_COLOR  0x000000FF
 
 #define DISPLAY_TRANSFER_FLAGS \
     (GX_TRANSFER_FLIP_VERT(0) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) | \
@@ -112,14 +133,226 @@ ITCM_CODE void bind_texture(grs_bitmap* bmp)     { (void)bmp; }
 
 g3_draw_tmap_func_t g3_draw_tmap_func = (g3_draw_tmap_func_t)g3_draw_tmap_tex;
 
-ITCM_CODE void g3_draw_poly(int nv, vms_vector** pointlist) {
-    (void)nv; (void)pointlist;
+// =============================================================================
+// Wireframe overlay
+// =============================================================================
+// Separate shader, VBO, and projection from the bitblt quad. Called by
+// g3_draw_poly to overlay polygon outlines on top of the back_buffer.
+//
+// Coordinate assumption: g3_draw_poly receives points already projected to
+// the game's 320x200 screen space by the software renderer. We take x/y as
+// pixel coords (with fixed-point precision to strip) and map them via an
+// orthographic projection onto the same region of the 3DS top screen where
+// the bitblt quad lives, so wireframes align with the underlying pixels.
+// =============================================================================
+
+// Descent gives us camera-space vertices in 16.16 fixed-point (F1_0 = 65536
+// = 1 "unit"). We project them on the CPU here, so the GPU-side projection
+// can stay as a simple screen-space ortho.
+//
+// Descent axis convention (confirmed by inspection):
+//   +X = right   +Y = up   +Z = forward (into the screen)
+// This is a left-handed system. Standard graphics conventions are
+// right-handed with -Z forward, so we need to flip Y (screen y grows down)
+// and handle Z as the depth-into-scene.
+
+// Vertical field of view in degrees
+#define WIRE_FOV_DEG      60.0f
+
+// Near/far clip planes in Descent units (F1_0 = 65536 = 1 unit).
+// Anything with z < WIRE_NEAR gets culled.
+#define WIRE_NEAR         0.1f
+#define WIRE_FAR          10000.0f
+
+// Line thickness in screen pixels (constant regardless of distance)
+#define WIRE_THICKNESS    1.0f
+
+// Max verts per frame — 6 verts per edge (thin quad as 2 tris) * edges
+#define WIRE_MAX_VERTS    (4096 * 6)
+
+typedef struct { float x, y, z; } wire_vertex;
+
+static shaderProgram_s  wire_program;
+static DVLB_s*          wire_dvlb;
+static int              wire_uLoc_projection;
+static int              wire_uLoc_color;
+static C3D_Mtx          wire_projection;
+static wire_vertex*     wire_vbo;       // linear-alloc'd
+static int              wire_vbo_count; // reset each frame
+
+// Precomputed projection scale factors — set once in wire_init
+static float wire_focal;         // distance in game-units from camera to projection plane
+static float wire_aspect_inv;    // 1/aspect (GAME_H/GAME_W)
+static float wire_half_w;        // QUAD region half-width (screen pixels)
+static float wire_half_h;        // QUAD region half-height
+static float wire_center_x;      // screen center of the quad region
+static float wire_center_y;
+
+static void wire_init(void)
+{
+    wire_dvlb = DVLB_ParseFile((u32*)vshader_wire_shbin, vshader_wire_shbin_size);
+    shaderProgramInit(&wire_program);
+    shaderProgramSetVsh(&wire_program, &wire_dvlb->DVLE[0]);
+
+    wire_uLoc_projection = shaderInstanceGetUniformLocation(wire_program.vertexShader, "projection");
+    wire_uLoc_color      = shaderInstanceGetUniformLocation(wire_program.vertexShader, "wireColor");
+
+    // GPU-side projection stays ortho in 3DS screen space. We do perspective
+    // projection on the CPU and emit screen coords directly.
+    Mtx_OrthoTilt(&wire_projection, 0.0f, SCREEN_W, SCREEN_H, 0.0f,
+                  -1.0f, 1.0f, true);
+
+    // Precompute focal length and viewport mapping.
+    // Standard perspective: screen_x = focal * (x / z), screen_y = focal * (y / z)
+    // where focal is chosen so that the edge of the frustum at z=1 lands at
+    // the edge of the screen. For FOV given as vertical angle:
+    //   tan(fov/2) = (screen_half_height) / focal   =>   focal = 1 / tan(fov/2)
+    float fov_rad = WIRE_FOV_DEG * (float)M_PI / 180.0f;
+    wire_focal       = 1.0f / tanf(fov_rad * 0.5f);
+    wire_aspect_inv  = (float)GAME_H / (float)GAME_W;
+
+    wire_half_w   = (QUAD_X1 - QUAD_X0) * 0.5f;
+    wire_half_h   = (QUAD_Y1 - QUAD_Y0) * 0.5f;
+    wire_center_x = (QUAD_X0 + QUAD_X1) * 0.5f;
+    wire_center_y = (QUAD_Y0 + QUAD_Y1) * 0.5f;
+
+    wire_vbo = linearAlloc(sizeof(wire_vertex) * WIRE_MAX_VERTS);
+    wire_vbo_count = 0;
 }
+
+// Project a camera-space point (16.16 fixed) to 3DS screen space.
+// Returns true if the point is in front of the camera, false if culled.
+//
+// Descent camera space: +X right, +Y up, +Z forward (left-handed).
+// We flip Y so screen-y grows downward (standard screen convention).
+static inline bool wire_project(fix cx, fix cy, fix cz,
+                                float* out_sx, float* out_sy)
+{
+    // Convert 16.16 fixed -> float units (F1_0 = 65536 = 1.0 unit)
+    float x = (float)cx * (1.0f / 65536.0f);
+    float y = (float)cy * (1.0f / 65536.0f);
+    float z = (float)cz * (1.0f / 65536.0f);
+
+    if (z < WIRE_NEAR || z > WIRE_FAR) return false;
+
+    // Perspective divide, scale by focal length and viewport.
+    // y is negated because Descent has +Y up, screen has +Y down.
+    float ndc_x =  (x / z) * wire_focal * wire_aspect_inv;
+    float ndc_y = -(y / z) * wire_focal;
+
+    *out_sx = wire_center_x + ndc_x * wire_half_w;
+    *out_sy = wire_center_y + ndc_y * wire_half_h;
+    return true;
+}
+
+// Emit a thickness-WIRE_THICKNESS line as two triangles (a thin quad).
+// Done on the CPU because PICA200 doesn't have a first-class line primitive
+// in citro3d (you'd need geometry shaders or pre-built line geometry).
+static void wire_emit_line(float x0, float y0, float x1, float y1)
+{
+    if (wire_vbo_count + 6 > WIRE_MAX_VERTS) return;
+
+    float dx = x1 - x0, dy = y1 - y0;
+    float len = sqrtf(dx * dx + dy * dy);
+    if (len < 0.0001f) return;
+
+    // Perpendicular unit vector, scaled by half-thickness
+    float px = -dy / len * (WIRE_THICKNESS * 0.5f);
+    float py =  dx / len * (WIRE_THICKNESS * 0.5f);
+
+    wire_vertex* v = &wire_vbo[wire_vbo_count];
+    // Tri 1
+    v[0].x = x0 + px; v[0].y = y0 + py; v[0].z = 0.0f;
+    v[1].x = x0 - px; v[1].y = y0 - py; v[1].z = 0.0f;
+    v[2].x = x1 + px; v[2].y = y1 + py; v[2].z = 0.0f;
+    // Tri 2
+    v[3].x = x1 + px; v[3].y = y1 + py; v[3].z = 0.0f;
+    v[4].x = x0 - px; v[4].y = y0 - py; v[4].z = 0.0f;
+    v[5].x = x1 - px; v[5].y = y1 - py; v[5].z = 0.0f;
+
+    wire_vbo_count += 6;
+}
+
+// Reset the per-frame wireframe buffer — call at the start of each frame,
+// before any g3_draw_poly calls.
+static void wire_frame_begin(void)
+{
+    wire_vbo_count = 0;
+}
+
+// Draw all buffered wireframe lines. Called after the bitblt quad so the
+// lines overlay on top of the back_buffer.
+static void wire_frame_end(void)
+{
+    if (wire_vbo_count == 0) return;
+
+    // Bind wireframe shader
+    C3D_BindProgram(&wire_program);
+
+    // Set up vertex attributes for wireframe (position only)
+    C3D_AttrInfo* attrInfo = C3D_GetAttrInfo();
+    AttrInfo_Init(attrInfo);
+    AttrInfo_AddLoader(attrInfo, 0, GPU_FLOAT, 3); // v0 = position
+
+    C3D_BufInfo* bufInfo = C3D_GetBufInfo();
+    BufInfo_Init(bufInfo);
+    BufInfo_Add(bufInfo, wire_vbo, sizeof(wire_vertex), 1, 0x0);
+
+    // Uniforms: projection + line color (white, fully opaque)
+    C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, wire_uLoc_projection, &wire_projection);
+    C3D_FVUnifSet(GPU_VERTEX_SHADER, wire_uLoc_color,
+                  1.0f, 1.0f, 1.0f, 1.0f);
+
+    // Lines should source their color from the vertex shader (primary color),
+    // not the bound texture. Swap the texenv temporarily.
+    C3D_TexEnv* env = C3D_GetTexEnv(0);
+    C3D_TexEnvInit(env);
+    C3D_TexEnvSrc(env, C3D_Both, GPU_PRIMARY_COLOR, 0, 0);
+    C3D_TexEnvFunc(env, C3D_Both, GPU_REPLACE);
+
+    C3D_DrawArrays(GPU_TRIANGLES, 0, wire_vbo_count);
+}
+
+// -----------------------------------------------------------------------------
+// Actual g3_draw_poly implementation — replaces the stub.
+// Takes an n-vertex convex polygon and emits its edges as line segments.
+// Expects camera-space coordinates in 16.16 fixed point.
+// -----------------------------------------------------------------------------
+#define WIRE_MAX_POLY_VERTS 16
+
+ITCM_CODE void g3_draw_poly(int nv, vms_vector** pointlist)
+{
+    if (nv < 2) return;
+    if (nv > WIRE_MAX_POLY_VERTS) nv = WIRE_MAX_POLY_VERTS;
+
+    // Project all vertices to screen space up front. Track which ones ended
+    // up in front of the camera so we can skip edges with a culled endpoint.
+    float sx[WIRE_MAX_POLY_VERTS], sy[WIRE_MAX_POLY_VERTS];
+    bool  visible[WIRE_MAX_POLY_VERTS];
+
+    for (int i = 0; i < nv; i++) {
+        visible[i] = wire_project(pointlist[i]->x, pointlist[i]->y,
+                                  pointlist[i]->z, &sx[i], &sy[i]);
+    }
+
+    // Emit edges. Skip any edge with at least one endpoint behind the camera.
+    // This is coarse (proper clipping would intersect the edge with the near
+    // plane) but good enough for a debug wireframe.
+    for (int i = 0; i < nv; i++) {
+        int j = (i + 1) % nv;
+        if (visible[i] && visible[j]) {
+            wire_emit_line(sx[i], sy[i], sx[j], sy[j]);
+        }
+    }
+}
+
 ITCM_CODE void g3_draw_tmap_flat(int nv, vms_vector** pointlist, g3s_uvl* uvl_list, grs_bitmap* bm) {
-    (void)nv; (void)pointlist; (void)uvl_list; (void)bm;
+    (void)uvl_list; (void)bm;
+    g3_draw_poly(nv, pointlist);
 }
 ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist, g3s_uvl* uvl_list, grs_bitmap* bm) {
-    (void)nv; (void)pointlist; (void)uvl_list; (void)bm;
+    (void)uvl_list; (void)bm;
+    g3_draw_poly(nv, pointlist);
 }
 ITCM_CODE void g3_draw_bitmap(vms_vector* pos, fix width, fix height, grs_bitmap* bm) {
     (void)pos; (void)width; (void)height; (void)bm;
@@ -197,27 +430,9 @@ void bitblt_to_screen(void)
 // for v0/v1 — PICA200 hardware is strict about these, emulators are not.
 
 // -----------------------------------------------------------------------------
-// Texture dimensions
-// -----------------------------------------------------------------------------
-#define TEX_W     512   // PICA200 requires power-of-two textures
-#define TEX_H     256
-#define GAME_W    320   // Game's native back_buffer width
-#define GAME_H    200   // Game's native back_buffer height
-#define UPLOAD_H  256   // Rows we actually upload (must cover the UV sample range)
-
-// -----------------------------------------------------------------------------
 // Quad covering most of the top screen with the game's aspect ratio
 // -----------------------------------------------------------------------------
 typedef struct { float x, y, z; float u, v; } tex_vertex;
-
-#define QUAD_X_MARGIN  40.0f
-#define QUAD_Y_MARGIN  20.0f
-#define QUAD_X0        QUAD_X_MARGIN
-#define QUAD_X1        (SCREEN_W - QUAD_X_MARGIN)
-#define QUAD_Y0        QUAD_Y_MARGIN
-#define QUAD_Y1        (SCREEN_H - QUAD_Y_MARGIN)
-#define QUAD_TEX_U     ((float)GAME_W / (float)TEX_W)
-#define QUAD_TEX_V     (56.0f / (float)TEX_H)
 
 static const tex_vertex quad_list[] = {
     // Triangle 1 — V coords flipped so the texture renders right-side up
@@ -365,10 +580,31 @@ void bitblt_to_screen(void)
     C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
     C3D_RenderTargetClear(target, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
     C3D_FrameDrawOn(target);
+
+    // Draw the bitblt quad (background)
+    C3D_BindProgram(&program);
+    C3D_AttrInfo* attrInfo = C3D_GetAttrInfo();
+    AttrInfo_Init(attrInfo);
+    AttrInfo_AddLoader(attrInfo, 0, GPU_FLOAT, 3);
+    AttrInfo_AddLoader(attrInfo, 1, GPU_FLOAT, 2);
+    C3D_BufInfo* bufInfo = C3D_GetBufInfo();
+    BufInfo_Init(bufInfo);
+    BufInfo_Add(bufInfo, vbo_data, sizeof(tex_vertex), 2, 0x10);
+    C3D_TexEnv* env = C3D_GetTexEnv(0);
+    C3D_TexEnvInit(env);
+    C3D_TexEnvSrc(env, C3D_Both, GPU_TEXTURE0, 0, 0);
+    C3D_TexEnvFunc(env, C3D_Both, GPU_REPLACE);
     C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLoc_projection, &projection);
     C3D_TexBind(0, &back_tex);
     C3D_DrawArrays(GPU_TRIANGLES, 0, quad_list_count);
+
+    // Draw wireframes on top (uses its own shader, VBO, and texenv)
+    wire_frame_end();
+
     C3D_FrameEnd(0);
+
+    // Reset wireframe buffer for next frame's g3_draw_poly calls
+    wire_frame_begin();
 }
 
 #endif // RENDER_MODE branch
@@ -386,6 +622,7 @@ void init_3ds_gpu(void)
     C3D_RenderTargetSetOutput(target, GFX_TOP, GFX_LEFT, DISPLAY_TRANSFER_FLAGS);
 
     sceneInit();
+    wire_init();
 }
 
 // =============================================================================
