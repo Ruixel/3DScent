@@ -1009,16 +1009,19 @@ static void log_missing_bitmap(grs_bitmap* bm, const char* reason)
 // -----------------------------------------------------------------------------
 extern ubyte gr_fade_table[];
 extern ubyte gr_current_pal[];
+extern ubyte gr_palette[];
 
 #define LIGHT_FADE_LEVELS  34
 #define LIGHT_WHITE_INDEX  255   // standard Descent: palette index 255 = white
 
-extern fix MAX_LIGHT;  // from game data, typically f1_0 = 65536
-static inline void light_to_rgb(fix l, float* out_r, float* out_g, float* out_b)
+static void light_to_rgb(fix l, float* out_r, float* out_g, float* out_b)
 {
-    // Simple brightness: light/MAX_LIGHT, clamped to [0,1].
-    // Could be enhanced with fade-table color shifts later.
-    float brightness = (float)l * (1.0f / (float)0x10000);
+    // Simple linear brightness. We tried the full fade-table + palette
+    // approach but the palette in use is essentially grayscale, so the
+    // color shift of the fade table wasn't visible — not worth the
+    // extra CPU work. Linear brightness matches Descent's atmosphere
+    // closely enough on a 3DS screen.
+    float brightness = (float)l * (1.0f / 65536.0f);
     if (brightness < 0.0f) brightness = 0.0f;
     if (brightness > 1.0f) brightness = 1.0f;
     *out_r = brightness;
@@ -1102,15 +1105,6 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
         in_u[i] = (float)uvl_list[i].u * (1.0f / 65536.0f) * gt->u_scale;
         in_v[i] = gt->v_scale - (float)uvl_list[i].v * (1.0f / 65536.0f) * gt->v_scale;
         // Per-vertex lighting: convert fix-point l value to RGB via fade table
-    //
-    {
-    static int dbg = 0;
-    if (dbg < 3) {
-        printf("vert0 light=%ld rgb=(%.2f,%.2f,%.2f)\n",
-               (long)uvl_list[0].l, in_r[0], in_g[0], in_b[0]);
-        dbg++;
-    }
-}
         light_to_rgb(uvl_list[i].l, &in_r[i], &in_g[i], &in_b[i]);
     }
 
@@ -1220,8 +1214,117 @@ ITCM_CODE void g3_draw_tmap_flat(int nv, vms_vector** pointlist,
 #endif
 }
 
-ITCM_CODE void g3_draw_bitmap(vms_vector* pos, fix width, fix height, grs_bitmap* bm) {
-    (void)pos; (void)width; (void)height; (void)bm;
+// =============================================================================
+// Sprite rendering: g3_draw_bitmap (billboards)
+// =============================================================================
+//
+// Billboards: 2D bitmaps that always face the camera. Descent passes
+// world-space position + radius; we transform to camera space and emit
+// a quad centered on the transformed position, aligned with camera axes.
+//
+// Reuses g3_draw_tmap_tex for actual rendering, which gets us proper
+// near-plane clipping, texture lookup, batching, and light modulation
+// for free. The only cost is converting our float coords back to
+// fix-point vms_vectors.
+//
+// Note: g3_draw_rod_tmap is defined in rod.c (forwards to g3_draw_tmap_tex)
+// so we don't implement it here.
+// -----------------------------------------------------------------------------
+#define MAX_LIGHT 0x10000  // fix-point 1.0 — used as "full bright" for sprites
+
+extern vms_vector View_position;
+extern vms_matrix View_matrix;
+
+// Transform a world-space point to camera space (float). Same math as
+// g3_rotate_point: subtract camera position, rotate by View_matrix.
+static inline void world_to_camera(vms_vector* world_pt,
+                                   float* out_x, float* out_y, float* out_z)
+{
+    vms_vector tempv, out;
+    vm_vec_sub(&tempv, world_pt, &View_position);
+    vm_vec_rotate(&out, &tempv, &View_matrix);
+    *out_x = (float)out.x * (1.0f / 65536.0f);
+    *out_y = (float)out.y * (1.0f / 65536.0f);
+    *out_z = (float)out.z * (1.0f / 65536.0f);
+}
+
+// Emit a 4-vert textured quad (as 2 triangles = 6 verts) into the world
+// batch system. Camera-space positions and UVs, plus a single light value
+// applied to all 4 corners.
+//
+// Routes through g3_draw_tmap_tex by constructing fake pointlist/uvl_list.
+// That path does near-plane clipping, perspective setup, and batching — we
+// get it all for free. The only cost is we need to convert our float
+// camera-space coords back to fix-point vms_vectors. Small CPU cost,
+// saves us from duplicating the clipping math.
+static void emit_sprite_quad(grs_bitmap* bm,
+                             float x0, float y0, float z0, float u0, float v0,
+                             float x1, float y1, float z1, float u1, float v1,
+                             float x2, float y2, float z2, float u2, float v2,
+                             float x3, float y3, float z3, float u3, float v3,
+                             fix light)
+{
+    // Convert camera-space floats back to fix-point so g3_draw_tmap_tex
+    // (which expects vms_vector*) can consume them.
+    static vms_vector  verts[4];
+    static vms_vector* ptrs[4] = { &verts[0], &verts[1], &verts[2], &verts[3] };
+    static g3s_uvl     uvls[4];
+
+    verts[0].x = (fix)(x0 * 65536); verts[0].y = (fix)(y0 * 65536); verts[0].z = (fix)(z0 * 65536);
+    verts[1].x = (fix)(x1 * 65536); verts[1].y = (fix)(y1 * 65536); verts[1].z = (fix)(z1 * 65536);
+    verts[2].x = (fix)(x2 * 65536); verts[2].y = (fix)(y2 * 65536); verts[2].z = (fix)(z2 * 65536);
+    verts[3].x = (fix)(x3 * 65536); verts[3].y = (fix)(y3 * 65536); verts[3].z = (fix)(z3 * 65536);
+
+    // UVs are in Descent's 16.16 fix convention where 1.0 = full texture.
+    // g3_draw_tmap_tex will scale by gt->u_scale/v_scale. We pass the raw
+    // [0..1] range as fix.
+    uvls[0].u = (fix)(u0 * 65536); uvls[0].v = (fix)(v0 * 65536); uvls[0].l = light;
+    uvls[1].u = (fix)(u1 * 65536); uvls[1].v = (fix)(v1 * 65536); uvls[1].l = light;
+    uvls[2].u = (fix)(u2 * 65536); uvls[2].v = (fix)(v2 * 65536); uvls[2].l = light;
+    uvls[3].u = (fix)(u3 * 65536); uvls[3].v = (fix)(v3 * 65536); uvls[3].l = light;
+
+    g3_draw_tmap_tex(4, ptrs, uvls, bm);
+}
+
+// Billboard sprite: a 2D bitmap at world position `pos`, always facing the
+// camera, with given world-space width x height. Used for explosions,
+// powerups, and some effects.
+ITCM_CODE void g3_draw_bitmap(vms_vector* pos, fix width, fix height, grs_bitmap* bm)
+{
+    if (!bm) return;
+
+    // Transform center to camera space
+    float cx, cy, cz;
+    world_to_camera(pos, &cx, &cy, &cz);
+
+    // Build billboard axes in CAMERA SPACE. The sprite faces the camera
+    // (its plane is perpendicular to the view direction), which means in
+    // camera space it's aligned with the XY plane. So right = +X, up = +Y.
+    //
+    // Descent passes `width`/`height` as the object radius (half-extent),
+    // NOT the full extent. So no *0.5 here.
+    float hw = (float)width  * (1.0f / 65536.0f);
+    float hh = (float)height * (1.0f / 65536.0f);
+
+    printf("spr size = %.2f x %.2f\n", hw, hh);
+
+    // UVs: g3_draw_tmap_tex applies a V-flip internally (walls need it
+    // because Descent's level-data V convention is opposite of PICA200's).
+    // For sprites, the bitmap data is stored in the natural "top row first"
+    // orientation, so we need our UVs to map "top of sprite" to "top of
+    // bitmap" = V=0 AFTER the flip. That means we send V=1 here so tmap_tex
+    // flips it to 0. In other words: pre-flip our UVs so tmap_tex's flip
+    // cancels out.
+    //
+    // Corner layout (looking at the sprite):
+    //   v0 = top-left     v1 = top-right
+    //   v3 = bottom-left  v2 = bottom-right
+    emit_sprite_quad(bm,
+                     cx - hw, cy + hh, cz,  0.0f, -0.5f,   // top-left
+                     cx + hw, cy + hh, cz,  1.0f, -0.5f,   // top-right
+                     cx + hw, cy - hh, cz,  1.0f, 1.0f,   // bottom-right
+                     cx - hw, cy - hh, cz,  0.0f, 1.0f,   // bottom-left
+                     MAX_LIGHT);
 }
 
 // =============================================================================

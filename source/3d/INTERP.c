@@ -175,7 +175,6 @@ ITCM_CODE bool g3_draw_polygon_model(void *model_ptr,grs_bitmap **model_bitmaps,
 
 				// 3DS port: transform object-space verts to camera space
 				xform_model_pts(nv, point_list);
-        // In OP_TMAPPOLY case, right before the g3_draw_tmap_func call:
 				g3_draw_tmap_func(nv, Model_xformed_ptrs, uvl_list,
 				                  model_bitmaps[w(p+28)]);
 
@@ -192,11 +191,23 @@ ITCM_CODE bool g3_draw_polygon_model(void *model_ptr,grs_bitmap **model_bitmaps,
 
 
 			case OP_RODBM: {
-				// NOTE: rods (laser bolts, energy beams) still pass raw
-				// object-space vectors. g3_draw_rod_tmap is a separate
-				// codepath we haven't audited yet. If rods render in the
-				// wrong place, this is the spot to fix.
-				g3_draw_rod_tmap(model_bitmaps[w(p+2)],vp(p+4),w(p+16),vp(p+20),w(p+32),f1_0);
+				// Transform object-space rod endpoints to camera space using
+				// the same math as xform_model_pts. rod.c's calc_rod_corners
+				// assumes its input vectors ARE in camera space (it normalizes
+				// the top endpoint to get a view direction), so we must
+				// transform before calling.
+				// Signature: g3_draw_rod_tmap(bm, bot, bot_w, top, top_w, light)
+				//   vp(p+4)  = bot_point
+				//   vp(p+20) = top_point
+				static vms_vector rod_bot, rod_top;
+				vms_vector tempv;
+				vm_vec_sub(&tempv, vp(p+4), &View_position);
+				vm_vec_rotate(&rod_bot, &tempv, &View_matrix);
+				vm_vec_sub(&tempv, vp(p+20), &View_position);
+				vm_vec_rotate(&rod_top, &tempv, &View_matrix);
+
+				g3_draw_rod_tmap(model_bitmaps[w(p+2)], &rod_bot, w(p+16),
+				                 &rod_top, w(p+32), f1_0);
 
 				p+=36;
 				break;
@@ -364,8 +375,16 @@ ITCM_CODE bool g3_draw_morphing_model(void *model_ptr,grs_bitmap **model_bitmaps
 
 
 			case OP_RODBM: {
-				// See note in g3_draw_polygon_model about rods.
-				g3_draw_rod_tmap(model_bitmaps[w(p+2)],vp(p+4),w(p+16),vp(p+20),w(p+32),f1_0);
+				// Same transform fix as g3_draw_polygon_model OP_RODBM.
+				static vms_vector rod_bot, rod_top;
+				vms_vector tempv;
+				vm_vec_sub(&tempv, vp(p+4), &View_position);
+				vm_vec_rotate(&rod_bot, &tempv, &View_matrix);
+				vm_vec_sub(&tempv, vp(p+20), &View_position);
+				vm_vec_rotate(&rod_top, &tempv, &View_matrix);
+
+				g3_draw_rod_tmap(model_bitmaps[w(p+2)], &rod_bot, w(p+16),
+				                 &rod_top, w(p+32), f1_0);
 
 				p+=36;
 				break;
