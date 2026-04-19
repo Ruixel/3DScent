@@ -760,9 +760,21 @@ void kc_drawitem( kc_item *item, int is_current )
 	x = item->w1+item->x+((item->w2-w)/2);
 
 //	if ( item->type == BT_KEY )
+  // Using I and U for ZL and ZR internally
+  char temp[10];
+  strncpy(temp, btext, 10);
+  if (item->value == 23) {
+    strncpy(btext, "ZL", 10);
+  } else if (item->value == 22) {
+    strncpy(btext, "ZR", 10);
+  }
+
+  printf( "kc_drawitem: %s, item value = %d\n", btext, item->value );
 		gr_string( x, item->y, btext );
 //	else if ( (item->type == BT_JOY_AXIS) || (item->type == BT_MOUSE_AXIS) || (item->type == BT_INVERT) )
 //		gr_string(x, item->y - 164, btext);
+  //
+  
 }
 
 static int looper=0;

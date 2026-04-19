@@ -345,6 +345,7 @@ void keyboard_handler()
 		HID_DUP    = 1<<6,  HID_DDOWN  = 1<<7,
 		HID_R      = 1<<8,  HID_L      = 1<<9,
 		HID_X      = 1<<10, HID_Y      = 1<<11,
+    HID_ZL     = 1<<14, HID_ZR     = 1<<15,
 	};
 
 	// Map 3DS buttons → Descent key scan codes
@@ -358,6 +359,8 @@ void keyboard_handler()
 	keyboard_updatekey (KEY_Y,     keys & HID_Y      ? 1 : 0);
 	keyboard_updatekey (KEY_R,     keys & HID_R      ? 1 : 0);
 	keyboard_updatekey (KEY_L,     keys & HID_L      ? 1 : 0);
+  keyboard_updatekey (KEY_U,    keys & HID_ZR     ? 1 : 0);
+  keyboard_updatekey (KEY_I,    keys & HID_ZL     ? 1 : 0);
 	keyboard_updatekey (KEY_ESC,   pressed & HID_START  ? 1 : 0);
 	keyboard_updatekey (KEY_TAB,   pressed & HID_SELECT ? 1 : 0);
 }
