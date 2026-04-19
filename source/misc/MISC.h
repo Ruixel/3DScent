@@ -1,6 +1,8 @@
 #ifndef __MISC_H__
 #define __MISC_H__
 
+#define random() (rand() & 0x7FFF)
+
 int min( int a, int b );
 int max( int a, int b );
 
