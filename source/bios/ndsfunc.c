@@ -1503,7 +1503,10 @@ ITCM_CODE void g3_draw_bitmap(vms_vector* pos, fix width, fix height, grs_bitmap
     // Descent passes `width`/`height` as the object radius (half-extent),
     // NOT the full extent. So no *0.5 here.
     float hw = (float)width  * (1.0f / 65536.0f);
-    float hh = (float)height * (1.0f / 65536.0f);
+    //float hh = (float)height * (1.0f / 65536.0f);
+  
+    gpu_tex_entry_t* gt = &gpu_tex_pool[bm->key >= 0 && bm->key < GPU_TEX_MAX ? bm->key : 0];
+    float hh = (float)height * (1.0f / 65536.0f) / gt->v_scale;
 
     // UV mapping for sprites — based on the working diagnostic from user:
     //   u_lo=0,            u_hi=1.0/u_scale  -> effective sampling [0, 1] in POT
