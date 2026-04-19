@@ -1680,7 +1680,12 @@ void sceneInit(void)
     memset(tex_buf, 0, TEX_W * TEX_H * 4);
 
     C3D_CullFace(GPU_CULL_NONE);
-    C3D_DepthTest(false, GPU_ALWAYS, GPU_WRITE_ALL);
+    // Enable depth test + write. Needed for polygon models (robots, reactor)
+    // so their faces occlude each other correctly.
+    //
+    // GPU_GEQUAL: PICA200 uses reversed-Z convention where near=1, far=0
+    // in the depth buffer. "nearer Z wins" = greater-or-equal passes.
+    C3D_DepthTest(true, GPU_GEQUAL, GPU_WRITE_ALL);
 
     C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD,
                    GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA,
@@ -1720,7 +1725,15 @@ static void draw_screen_contents(void)
     C3D_TexEnvFunc(env, C3D_Both, GPU_REPLACE);
     C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLoc_projection, &projection);
     C3D_TexBind(0, &back_tex);
+
+    // Bitblt quad is the 2D UI/HUD layer. Draw it with depth writes DISABLED
+    // so it doesn't occlude world geometry. Depth test is irrelevant here
+    // because bitblt is drawn first (nothing to test against yet).
+    C3D_DepthTest(false, GPU_ALWAYS, GPU_WRITE_COLOR);
     C3D_DrawArrays(GPU_TRIANGLES, 0, quad_list_count);
+
+    // Re-enable depth test + write for world geometry drawn after this.
+    C3D_DepthTest(true, GPU_GEQUAL, GPU_WRITE_ALL);
 
     world_frame_end();
 }
@@ -1828,9 +1841,6 @@ void bitblt_to_screen(void)
 void init_3ds_gpu(void)
 {
     gfxSet3D(true);   // enable stereoscopic 3D — used when slider > 0
-  
-    // Easy 60fps but only on new 3ds
-    osSetSpeedupEnable(true);
     C3D_Init(C3D_DEFAULT_CMDBUF_SIZE);
 
     // Two render targets so we can draw left + right eye separately.
