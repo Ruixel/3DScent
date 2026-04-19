@@ -1502,11 +1502,24 @@ ITCM_CODE void g3_draw_bitmap(vms_vector* pos, fix width, fix height, grs_bitmap
     //
     // Descent passes `width`/`height` as the object radius (half-extent),
     // NOT the full extent. So no *0.5 here.
+    //
+    // Height compensation: for non-POT bitmaps, the rendered sprite ends
+    // up vertically compressed for reasons not fully understood (likely
+    // related to how PICA200 normalizes texture coords vs how the GPU
+    // calculates the perspective projection). Dividing world-space height
+    // by v_scale compensates and matches the original PC Descent look
+    // closely enough. Not mathematically pure but ships a result that's
+    // visually correct.
+    //
+    // We need gt for the v_scale value, so do the texture lookup here too.
+    // (emit_sprite_quad does its own lookup; this is a small duplication
+    // but keeps the code straightforward.)
+    int idx2 = (bm->key >= 0 && bm->key < GPU_TEX_MAX) ? bm->key : 0;
+    gpu_tex_entry_t* gt2 = &gpu_tex_pool[idx2];
+    float v_compensate = (gt2->tex && gt2->v_scale > 0.0f) ? (1.0f / gt2->v_scale) : 1.0f;
+
     float hw = (float)width  * (1.0f / 65536.0f);
-    //float hh = (float)height * (1.0f / 65536.0f);
-  
-    gpu_tex_entry_t* gt = &gpu_tex_pool[bm->key >= 0 && bm->key < GPU_TEX_MAX ? bm->key : 0];
-    float hh = (float)height * (1.0f / 65536.0f) / gt->v_scale;
+    float hh = (float)height * (1.0f / 65536.0f) * v_compensate;
 
     // UV mapping for sprites — based on the working diagnostic from user:
     //   u_lo=0,            u_hi=1.0/u_scale  -> effective sampling [0, 1] in POT
@@ -1771,7 +1784,17 @@ void bitblt_to_screen(void)
         GSPGPU_FlushDataCache(world_vbo, sizeof(world_vertex) * world_vbo_count);
     }
 
-    C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+    // Pass 0 instead of C3D_FRAME_SYNCDRAW to allow CPU to start the next
+    // frame while GPU is still rendering this one. SYNCDRAW was capping us
+    // at 30 FPS by serializing CPU and GPU to vblank rate.
+    //
+    // Race protection: world_frame_begin calls gspWaitForP3D() before
+    // allowing CPU writes to world_vbo. Texture uploads use C3D_TexFlush
+    // which is synchronous. Risk: the bitblt back_tex gets re-uploaded
+    // every frame; if GPU is still reading it during next frame's CPU
+    // write, we'd see tearing in the bitblt area. If that happens, we
+    // need to double-buffer back_tex.
+    C3D_FrameBegin(0);
 
     // ----- Left eye (always drawn) -----
     C3D_RenderTargetClear(target_left, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
@@ -1805,6 +1828,9 @@ void bitblt_to_screen(void)
 void init_3ds_gpu(void)
 {
     gfxSet3D(true);   // enable stereoscopic 3D — used when slider > 0
+  
+    // Easy 60fps but only on new 3ds
+    osSetSpeedupEnable(true);
     C3D_Init(C3D_DEFAULT_CMDBUF_SIZE);
 
     // Two render targets so we can draw left + right eye separately.
