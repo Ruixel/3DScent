@@ -951,11 +951,118 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
 
 #else // WORLD_MODE_TEXTURED
 
+// -----------------------------------------------------------------------------
+// Flat-shaded polygon rendering.
+//
+// OP_FLATPOLY in interp.c passes the color via gr_setcolor(w(p+28)), which
+// writes to the current canvas's cv_color. Rather than depend on that
+// global, we expose a new entry point g3_draw_poly_flat_color() that takes
+// the color as an argument. OP_FLATPOLY is patched to call this directly.
+//
+// Used for: laser bolts (polygon models with flat-shaded geometry), some
+// weapon trails, missile particle effects, occasional HUD elements.
+//
+// Implementation: emit a triangle fan via the normal world batch path,
+// using a shared 1x1 white texture. Vertex color = palette[color_idx],
+// so (white texture) × (vertex color) = palette color. Gets us free
+// near-plane clipping + stereo + batching through existing pipeline.
+// -----------------------------------------------------------------------------
+static C3D_Tex white_tex;
+static bool    white_tex_ready = false;
+
+extern ubyte gr_palette[];
+
+static void white_tex_init(void)
+{
+    if (white_tex_ready) return;
+    // 8x8 minimum for the tiler (which operates on 8x8 tiles)
+    if (!C3D_TexInit(&white_tex, 8, 8, GPU_RGBA5551)) return;
+    C3D_TexSetFilter(&white_tex, GPU_LINEAR, GPU_LINEAR);
+    C3D_TexSetWrap(&white_tex, GPU_REPEAT, GPU_REPEAT);
+
+    u16 src[64];
+    for (int i = 0; i < 64; i++) src[i] = 0xFFFF;  // white, alpha=1
+    tex_upload_5551(&white_tex, src, 8, 8, 8);
+    white_tex_ready = true;
+}
+
+// Public entry point: flat-shaded polygon with explicit color.
+ITCM_CODE void g3_draw_poly_flat_color(int nv, vms_vector** pointlist, int color_idx)
+{
+    if (nv < 3) return;
+    if (!white_tex_ready) white_tex_init();
+    if (!white_tex_ready) return;
+
+    // Convert palette index to RGB (6-bit → normalized float)
+    float r = (float)gr_palette[color_idx * 3 + 0] * (1.0f / 63.0f);
+    float g = (float)gr_palette[color_idx * 3 + 1] * (1.0f / 63.0f);
+    float b = (float)gr_palette[color_idx * 3 + 2] * (1.0f / 63.0f);
+
+    // Near-plane clipping via Sutherland-Hodgman (same approach as tmap_tex)
+    if (nv > WORLD_MAX_POLY_VERTS) nv = WORLD_MAX_POLY_VERTS;
+
+    float in_cx[WORLD_MAX_POLY_VERTS], in_cy[WORLD_MAX_POLY_VERTS], in_cz[WORLD_MAX_POLY_VERTS];
+    for (int i = 0; i < nv; i++) {
+        in_cx[i] = (float)pointlist[i]->x * (1.0f / 65536.0f);
+        in_cy[i] = (float)pointlist[i]->y * (1.0f / 65536.0f);
+        in_cz[i] = (float)pointlist[i]->z * (1.0f / 65536.0f);
+    }
+
+    #define FLAT_CLIP_MAX (WORLD_MAX_POLY_VERTS + 2)
+    float cx[FLAT_CLIP_MAX], cy[FLAT_CLIP_MAX], cz[FLAT_CLIP_MAX];
+    int out_nv = 0;
+
+    for (int i = 0; i < nv; i++) {
+        int j = (i + 1) % nv;
+        bool curr_in = in_cz[i] >= WIRE_NEAR;
+        bool next_in = in_cz[j] >= WIRE_NEAR;
+
+        if (curr_in) {
+            cx[out_nv] = in_cx[i]; cy[out_nv] = in_cy[i]; cz[out_nv] = in_cz[i];
+            out_nv++;
+        }
+        if (curr_in != next_in) {
+            float t = (WIRE_NEAR - in_cz[i]) / (in_cz[j] - in_cz[i]);
+            cx[out_nv] = in_cx[i] + t * (in_cx[j] - in_cx[i]);
+            cy[out_nv] = in_cy[i] + t * (in_cy[j] - in_cy[i]);
+            cz[out_nv] = WIRE_NEAR;
+            out_nv++;
+        }
+    }
+
+    if (out_nv < 3) return;
+
+    int needed = (out_nv - 2) * 3;
+    if (world_vbo_count + needed > WIRE_MAX_VERTS) return;
+
+    // Get/create batch for the white texture
+    world_batch_t* batch;
+    if (world_last_tex == &white_tex && world_batch_count > 0) {
+        batch = &world_batches[world_batch_count - 1];
+    } else {
+        if (world_batch_count >= WORLD_MAX_BATCHES) return;
+        batch = &world_batches[world_batch_count++];
+        batch->tex = &white_tex;
+        batch->vert_start = world_vbo_count;
+        batch->vert_count = 0;
+        world_last_tex = &white_tex;
+    }
+
+    // Fan triangulate; UV 0.5 samples middle of white texture (always white)
+    for (int i = 1; i < out_nv - 1; i++) {
+        world_emit_vert(cx[0],   cy[0],   cz[0],   0.5f, 0.5f, r, g, b);
+        world_emit_vert(cx[i],   cy[i],   cz[i],   0.5f, 0.5f, r, g, b);
+        world_emit_vert(cx[i+1], cy[i+1], cz[i+1], 0.5f, 0.5f, r, g, b);
+    }
+    batch->vert_count += needed;
+}
+
+// Backwards-compat: legacy g3_draw_poly with no color. Used by a few paths
+// that set color via gr_setcolor. For now, default to white since we
+// haven't wired up reading the current canvas color.
 ITCM_CODE void g3_draw_poly(int nv, vms_vector** pointlist)
 {
-    // Untextured polys (HUD elements, flat-shaded stuff). Phase 1 ignores
-    // these entirely — they'd need a separate "flat colored" path.
-    (void)nv; (void)pointlist;
+    g3_draw_poly_flat_color(nv, pointlist, 15);  // 15 = light gray in Descent palette
 }
 
 // -----------------------------------------------------------------------------
@@ -1257,6 +1364,13 @@ static inline void world_to_camera(vms_vector* world_pt,
 // get it all for free. The only cost is we need to convert our float
 // camera-space coords back to fix-point vms_vectors. Small CPU cost,
 // saves us from duplicating the clipping math.
+// Emit a 4-vert textured quad directly into the world batch system.
+// Takes UVs in [0, 1] over the VALID (non-padded) image region. Applies
+// u_scale/v_scale to get the actual GPU texture coords, WITHOUT the V-flip
+// that tmap_tex does for walls. Sprite bitmaps have their own convention
+// and get their own path.
+//
+// This bypasses tmap_tex's near-plane clipping. We handle it manually here.
 static void emit_sprite_quad(grs_bitmap* bm,
                              float x0, float y0, float z0, float u0, float v0,
                              float x1, float y1, float z1, float u1, float v1,
@@ -1264,26 +1378,111 @@ static void emit_sprite_quad(grs_bitmap* bm,
                              float x3, float y3, float z3, float u3, float v3,
                              fix light)
 {
-    // Convert camera-space floats back to fix-point so g3_draw_tmap_tex
-    // (which expects vms_vector*) can consume them.
-    static vms_vector  verts[4];
-    static vms_vector* ptrs[4] = { &verts[0], &verts[1], &verts[2], &verts[3] };
-    static g3s_uvl     uvls[4];
+    if (!bm) return;
 
-    verts[0].x = (fix)(x0 * 65536); verts[0].y = (fix)(y0 * 65536); verts[0].z = (fix)(z0 * 65536);
-    verts[1].x = (fix)(x1 * 65536); verts[1].y = (fix)(y1 * 65536); verts[1].z = (fix)(z1 * 65536);
-    verts[2].x = (fix)(x2 * 65536); verts[2].y = (fix)(y2 * 65536); verts[2].z = (fix)(z2 * 65536);
-    verts[3].x = (fix)(x3 * 65536); verts[3].y = (fix)(y3 * 65536); verts[3].z = (fix)(z3 * 65536);
+    // Find GPU texture (same lookup chain as tmap_tex uses)
+    int idx;
+    if (is_composite_key(bm->key)) {
+        texmerge_track_t* tt = texmerge_track_get(bm);
+        if (tt->slot < 0 || tt->composite_key != bm->key) {
+            if (tt->slot >= 0 && orphan_slot_count < ORPHAN_SLOTS_MAX) {
+                orphan_slots[orphan_slot_count++] = tt->slot;
+            }
+            tt->slot = gpu_tex_upload_dynamic(bm);
+            if (tt->slot < 0) return;
+            tt->composite_key = bm->key;
+            bm->key = tt->composite_key;
+        }
+        idx = tt->slot;
+    } else {
+        idx = bm->key;
+        if (idx < 0 || idx >= GPU_TEX_MAX || !gpu_tex_pool[idx].tex) {
+            idx = bm_hash_lookup(bm->bm_data);
+            if (idx < 0 || !gpu_tex_pool[idx].tex) {
+                idx = gpu_tex_upload_dynamic(bm);
+                if (idx < 0) return;
+            } else {
+                bm->key = idx;
+            }
+        }
+    }
+    gpu_tex_entry_t* gt = &gpu_tex_pool[idx];
+    if (!gt->tex) return;
 
-    // UVs are in Descent's 16.16 fix convention where 1.0 = full texture.
-    // g3_draw_tmap_tex will scale by gt->u_scale/v_scale. We pass the raw
-    // [0..1] range as fix.
-    uvls[0].u = (fix)(u0 * 65536); uvls[0].v = (fix)(v0 * 65536); uvls[0].l = light;
-    uvls[1].u = (fix)(u1 * 65536); uvls[1].v = (fix)(v1 * 65536); uvls[1].l = light;
-    uvls[2].u = (fix)(u2 * 65536); uvls[2].v = (fix)(v2 * 65536); uvls[2].l = light;
-    uvls[3].u = (fix)(u3 * 65536); uvls[3].v = (fix)(v3 * 65536); uvls[3].l = light;
+    // Scale input UVs [0, 1] to GPU texture coords. NO V flip (sprite has
+    // its own convention, unlike walls).
+    //
+    // NOTE: u_scale/v_scale handling for non-POT textures appears to be
+    // wrong somewhere — when we apply them, sprites get cropped. When we
+    // skip them (sample [0, 1]), sprites render fully without cropping.
+    // This suggests the GPU is already sampling [0, 1] over the bitmap
+    // dimensions, not the POT texture dimensions. Possibly C3D_TexInit
+    // configures sampling bounds based on a parameter we're missing.
+    //
+    // For now: pass UVs through without scaling. Walls still get scaling
+    // via tmap_tex's separate path.
+    float su0 = u0, sv0 = v0;
+    float su1 = u1, sv1 = v1;
+    float su2 = u2, sv2 = v2;
+    float su3 = u3, sv3 = v3;
 
-    g3_draw_tmap_tex(4, ptrs, uvls, bm);
+    // Compute lighting RGB
+    float r, g, b;
+    light_to_rgb(light, &r, &g, &b);
+
+    // Near-plane clipping for 4-vertex polygon
+    float in_cx[4] = {x0, x1, x2, x3};
+    float in_cy[4] = {y0, y1, y2, y3};
+    float in_cz[4] = {z0, z1, z2, z3};
+    float in_u [4] = {su0, su1, su2, su3};
+    float in_v [4] = {sv0, sv1, sv2, sv3};
+
+    float cx[6], cy[6], cz[6], u[6], v[6];
+    int out_nv = 0;
+    for (int i = 0; i < 4; i++) {
+        int j = (i + 1) % 4;
+        bool curr_in = in_cz[i] >= WIRE_NEAR;
+        bool next_in = in_cz[j] >= WIRE_NEAR;
+        if (curr_in) {
+            cx[out_nv] = in_cx[i]; cy[out_nv] = in_cy[i]; cz[out_nv] = in_cz[i];
+            u[out_nv]  = in_u[i];  v[out_nv]  = in_v[i];
+            out_nv++;
+        }
+        if (curr_in != next_in) {
+            float t = (WIRE_NEAR - in_cz[i]) / (in_cz[j] - in_cz[i]);
+            cx[out_nv] = in_cx[i] + t * (in_cx[j] - in_cx[i]);
+            cy[out_nv] = in_cy[i] + t * (in_cy[j] - in_cy[i]);
+            cz[out_nv] = WIRE_NEAR;
+            u[out_nv]  = in_u[i]  + t * (in_u[j]  - in_u[i]);
+            v[out_nv]  = in_v[i]  + t * (in_v[j]  - in_v[i]);
+            out_nv++;
+        }
+    }
+    if (out_nv < 3) return;
+
+    int needed = (out_nv - 2) * 3;
+    if (world_vbo_count + needed > WIRE_MAX_VERTS) return;
+
+    // Get/create batch
+    world_batch_t* batch;
+    if (world_last_tex == gt->tex && world_batch_count > 0) {
+        batch = &world_batches[world_batch_count - 1];
+    } else {
+        if (world_batch_count >= WORLD_MAX_BATCHES) return;
+        batch = &world_batches[world_batch_count++];
+        batch->tex = gt->tex;
+        batch->vert_start = world_vbo_count;
+        batch->vert_count = 0;
+        world_last_tex = gt->tex;
+    }
+
+    // Fan triangulate
+    for (int i = 1; i < out_nv - 1; i++) {
+        world_emit_vert(cx[0],   cy[0],   cz[0],   u[0],   v[0],   r, g, b);
+        world_emit_vert(cx[i],   cy[i],   cz[i],   u[i],   v[i],   r, g, b);
+        world_emit_vert(cx[i+1], cy[i+1], cz[i+1], u[i+1], v[i+1], r, g, b);
+    }
+    batch->vert_count += needed;
 }
 
 // Billboard sprite: a 2D bitmap at world position `pos`, always facing the
@@ -1306,24 +1505,23 @@ ITCM_CODE void g3_draw_bitmap(vms_vector* pos, fix width, fix height, grs_bitmap
     float hw = (float)width  * (1.0f / 65536.0f);
     float hh = (float)height * (1.0f / 65536.0f);
 
-    printf("spr size = %.2f x %.2f\n", hw, hh);
-
-    // UVs: g3_draw_tmap_tex applies a V-flip internally (walls need it
-    // because Descent's level-data V convention is opposite of PICA200's).
-    // For sprites, the bitmap data is stored in the natural "top row first"
-    // orientation, so we need our UVs to map "top of sprite" to "top of
-    // bitmap" = V=0 AFTER the flip. That means we send V=1 here so tmap_tex
-    // flips it to 0. In other words: pre-flip our UVs so tmap_tex's flip
-    // cancels out.
+    // UV mapping for sprites — based on the working diagnostic from user:
+    //   u_lo=0,            u_hi=1.0/u_scale  -> effective sampling [0, 1] in POT
+    //   v_lo=1.0/v_scale,  v_hi=0            -> V is inverted in PICA200's
+    //                                            sampling convention
     //
-    // Corner layout (looking at the sprite):
-    //   v0 = top-left     v1 = top-right
-    //   v3 = bottom-left  v2 = bottom-right
+    // After removing u_scale/v_scale from emit_sprite_quad, we just send
+    // [0, 1] UVs directly. V is inverted to match the user's working fix:
+    // top of sprite needs V=1 to sample top of image.
+    float u_lo = 0.0f, u_hi = 1.0f;
+    float v_lo = 1.0f, v_hi = 0.0f;
+
+    // Corner layout in camera space (+Y is UP):
     emit_sprite_quad(bm,
-                     cx - hw, cy + hh, cz,  0.0f, -0.5f,   // top-left
-                     cx + hw, cy + hh, cz,  1.0f, -0.5f,   // top-right
-                     cx + hw, cy - hh, cz,  1.0f, 1.0f,   // bottom-right
-                     cx - hw, cy - hh, cz,  0.0f, 1.0f,   // bottom-left
+                     cx - hw, cy + hh, cz,  u_lo, v_lo,   // top-left
+                     cx + hw, cy + hh, cz,  u_hi, v_lo,   // top-right
+                     cx + hw, cy - hh, cz,  u_hi, v_hi,   // bottom-right
+                     cx - hw, cy - hh, cz,  u_lo, v_hi,   // bottom-left
                      MAX_LIGHT);
 }
 

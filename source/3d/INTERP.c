@@ -132,14 +132,17 @@ ITCM_CODE bool g3_draw_polygon_model(void *model_ptr,grs_bitmap **model_bitmaps,
 
 				Assert( nv < MAX_POINTS_PER_POLY );
 
-				gr_setcolor(w(p+28));
+				gr_setcolor(w(p+28));  // keep for any other code that reads current color
 
 				for (i=0;i<nv;i++)
 					point_list[i] = list[wp(p+30)[i]];
 
-				// 3DS port: transform object-space verts to camera space
+				// 3DS port: transform object-space verts to camera space,
+				// then pass color index directly (don't rely on gr_setcolor
+				// global).
 				xform_model_pts(nv, point_list);
-				g3_draw_poly(nv, Model_xformed_ptrs);
+				extern void g3_draw_poly_flat_color(int nv, vms_vector** pts, int color_idx);
+				g3_draw_poly_flat_color(nv, Model_xformed_ptrs, w(p+28));
 
 				p += 30 + ((nv&~1)+1)*2;
 				break;
@@ -297,11 +300,11 @@ ITCM_CODE bool g3_draw_morphing_model(void *model_ptr,grs_bitmap **model_bitmaps
 				for (ntris=nv-2;ntris;ntris--) {
 					point_list[2] = list[wp(p+30)[i++]];
 
-					// 3DS port: transform object-space verts to camera space.
-					// Each tri gets its own transform pass since point_list
-					// changes between iterations.
+					// 3DS port: transform object-space verts to camera space
+					// and pass color index directly.
 					xform_model_pts(3, point_list);
-					g3_draw_poly(3, Model_xformed_ptrs);
+					extern void g3_draw_poly_flat_color(int nv, vms_vector** pts, int color_idx);
+					g3_draw_poly_flat_color(3, Model_xformed_ptrs, w(p+28));
 
 					point_list[1] = point_list[2];
 				}
