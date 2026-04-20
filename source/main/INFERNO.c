@@ -1606,7 +1606,7 @@ int main(int argc,char **argv)
 		game_init_render_buffers(screen_mode, screen_width, screen_height, use_double_buffer, vr_mode, screen_compatible );
 	}
 */
-		game_init_render_buffers(SM_320x200C, 400, 240, 0, VR_NONE, 1);
+		game_init_render_buffers(SM_320x200C, 320, 200, 0, VR_NONE, 1);
 /*
 	if (Game_victor_flag) {
 		char *vswitch = getenv( "CYBERMAXX" );
@@ -1672,7 +1672,6 @@ int main(int argc,char **argv)
 			//free(title_bm.bm_data);
 		} else {
 			gr_close();
-			Error( "Couldn't load pcx file '%s', PCX load error: %s\n",filename, pcx_errormsg(pcx_error));
 		}
 	}
 */

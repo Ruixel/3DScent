@@ -113,7 +113,8 @@ static void*             vbo_data;
 
 // Clear to black for gameplay. Swap to 0x68B0D8FF if you want a visible
 // background behind transparent (palette-index-0) pixels during testing.
-#define CLEAR_COLOR  0x68B0D8FF
+//#define CLEAR_COLOR  0x68B0D8FF
+#define CLEAR_COLOR  0x000000FF
 
 #define DISPLAY_TRANSFER_FLAGS \
     (GX_TRANSFER_FLIP_VERT(0) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) | \
@@ -1690,7 +1691,12 @@ void sceneInit(void)
     C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD,
                    GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA,
                    GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA);
-    C3D_AlphaTest(false, GPU_ALWAYS, 0);
+    // Enable alpha test: discard pixels with alpha = 0. Critical for sprites:
+    // their transparent edges would otherwise WRITE depth, causing geometry
+    // behind them to be incorrectly z-culled (showing as holes through
+    // models). Condition: alpha > 0 passes. Also benefits transparent wall
+    // textures (grates, energy fields).
+    C3D_AlphaTest(true, GPU_GREATER, 0);
 
     C3D_TexEnv* env = C3D_GetTexEnv(0);
     C3D_TexEnvInit(env);
@@ -1711,6 +1717,12 @@ void sceneInit(void)
 // draws twice with different projection matrices.
 static void draw_screen_contents(void)
 {
+
+    // Re-enable depth test + write for world geometry drawn after this.
+    C3D_DepthTest(true, GPU_GEQUAL, GPU_WRITE_ALL);
+
+    world_frame_end();
+
     C3D_BindProgram(&program);
     C3D_AttrInfo* attrInfo = C3D_GetAttrInfo();
     AttrInfo_Init(attrInfo);
@@ -1731,11 +1743,6 @@ static void draw_screen_contents(void)
     // because bitblt is drawn first (nothing to test against yet).
     C3D_DepthTest(false, GPU_ALWAYS, GPU_WRITE_COLOR);
     C3D_DrawArrays(GPU_TRIANGLES, 0, quad_list_count);
-
-    // Re-enable depth test + write for world geometry drawn after this.
-    C3D_DepthTest(true, GPU_GEQUAL, GPU_WRITE_ALL);
-
-    world_frame_end();
 }
 
 void bitblt_to_screen(void)

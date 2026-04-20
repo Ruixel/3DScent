@@ -1425,7 +1425,7 @@ void hud_show_lives(int x, int y)
 //		gr_set_fontcolor(gr_getcolor(0,31,0),-1 );
 		hud_printf(&x, &y, "%s: %d", TXT_DEATHS, Players[Player_num].net_killed_total);
 	} 
-	else if (Players[Player_num].lives > 1)  {
+	else {
 //		gr_set_fontcolor(gr_getcolor(0,20,0),-1 );
 		PIGGY_PAGE_IN(Gauges[GAUGE_LIVES]);
 		if (x > 0)
@@ -2224,8 +2224,15 @@ void show_reticle(int force_big_one)
 	int laser_ready,missile_ready,laser_ammo,missile_ammo;
 	int cross_bm_num,primary_bm_num,secondary_bm_num;
 
+  // wtf
+  grd_curcanv->cv_bitmap.bm_w = 320;
+  grd_curcanv->cv_bitmap.bm_h = 200;
+  //grd_curcanv->cv_w = 320;
+  //grd_curcanv->cv_h = 200;
+
 	x = grd_curcanv->cv_w/2;
-	y = (grd_curcanv->cv_h - 192)/2;
+	//y = (grd_curcanv->cv_h - 192)/2;
+	y = (grd_curcanv->cv_h)/2;
 
 	laser_ready = allowed_to_fire_laser();
 	missile_ready = allowed_to_fire_missile();
@@ -2257,6 +2264,7 @@ void show_reticle(int force_big_one)
 		gr_ubitmapm(x-15,y+6,&GameBitmaps[Gauges[RETICLE_PRIMARY + primary_bm_num].index]);
 		PIGGY_PAGE_IN(Gauges[RETICLE_SECONDARY + secondary_bm_num]);
 		gr_ubitmapm(x-12,y+1,&GameBitmaps[Gauges[RETICLE_SECONDARY + secondary_bm_num].index]);
+		//gr_ubitmapm(x-12,y+80,&GameBitmaps[Gauges[RETICLE_SECONDARY + secondary_bm_num].index]); // used this for centering the framerate hud >_<
 	} else {
 		PIGGY_PAGE_IN(Gauges[SML_RETICLE_CROSS + cross_bm_num]);
 		gr_ubitmapm(x-2,y-1,&GameBitmaps[Gauges[SML_RETICLE_CROSS + cross_bm_num].index]);
@@ -2479,16 +2487,23 @@ void draw_hud()
 /*		if (Cockpit_mode==CM_STATUS_BAR || Cockpit_mode==CM_FULL_SCREEN)
 			hud_show_homing_warning(0x8000, -1);
 */
+    // ugly hack to get hud to render, only needs to run once not per frame
+    gr_set_current_canvas(get_current_game_screen());
+		gr_set_curfont( Gamefonts[GFONT_SMALL] );    
+    gr_set_fontcolor( BM_XRGB(0,28,0), -1);
 		
 		if (Cockpit_mode==CM_FULL_SCREEN) {
-/*			hud_show_energy(2, -1);
+			hud_show_energy(2, -1);
 			hud_show_shield(2, -9);
 			hud_show_primary_weapon (-1, -9);
 			hud_show_secondary_weapon (-1, -1);
-			hud_show_keys(2, 192 + 60);
+      hud_show_score(-2, 1);
+      hud_show_lives(2, 1);
+      show_framerate(140, -1);
+			hud_show_keys(2, 9);
 			hud_show_cloak(2, -25);
 			hud_show_invuln(2, -33);
-*/
+
 			if ( ( Newdemo_state==ND_STATE_RECORDING ) && ( Players[Player_num].flags != old_flags[0] )) {
 				newdemo_record_player_flags(old_flags[0], Players[Player_num].flags);
 				old_flags[0] = Players[Player_num].flags;
