@@ -2028,6 +2028,12 @@ ReadFileNames:
 		}
 	}
 	dir_close (dir);
+
+  // Print files found
+  for (i = 0; i < NumFiles; i++) {
+    printf("Found file: %s\n", &filenames[i*14]);
+  }
+
 #if 0
 #ifdef SATURN
 	// Seach CD for files if demo_mode and cd_mode
@@ -2093,6 +2099,7 @@ ReadFileNames:
 		if (w_w > grd_curcanv->cv_bitmap.bm_w) w_w = grd_curcanv->cv_bitmap.bm_w;
 		if (w_h > grd_curcanv->cv_bitmap.bm_h) w_h = grd_curcanv->cv_bitmap.bm_h;
 
+		//w_x = (grd_curcanv->cv_bitmap.bm_w-w_w)/2;
 		w_x = (grd_curcanv->cv_bitmap.bm_w-w_w)/2;
 		if ((r = w_x & 0x7)) {
 			for (i = 0; i < r; i++)
@@ -2304,6 +2311,7 @@ ReadFileNames:
 			}
 		}
 			
+    int offset = 32;
 		if (ofirst_item != first_item )	{
 			gr_setcolor( BM_XRGB( 0,0,0)  );
 			for (i=first_item; i<first_item+NumFiles_displayed; i++ )	{
@@ -2311,15 +2319,15 @@ ReadFileNames:
 				y = (i-first_item)*12+w_y+45;
 				if ( i >= NumFiles )	{
 					gr_setcolor( BM_XRGB(0,0,0));
-					gr_rect( 50, y-1, 198, y+11 );
+					gr_rect( 50+offset , y-1, 198+offset, y+11 );
 				} else {
 					if ( i == citem )	
 						grd_curcanv->cv_font = Gamefonts[GFONT_MEDIUM_2];
 					else	
 						grd_curcanv->cv_font = Gamefonts[GFONT_MEDIUM_1];
 					gr_get_string_size(&filenames[i*14], &w, &h, &aw  );
-					gr_rect( 50, y-1, 198, y+11 );
-					gr_string( 55, y, (&filenames[i*14])+((player_mode && filenames[i*14]=='$')?1:0)  );
+					gr_rect( 50+offset, y-1, 198+offset, y+11 );
+					gr_string( 55+offset, y, (&filenames[i*14])+((player_mode && filenames[i*14]=='$')?1:0)  );
 				}
 			}
 		} else if ( citem != ocitem )	{
@@ -2333,8 +2341,8 @@ ReadFileNames:
 				else	
 					grd_curcanv->cv_font = Gamefonts[GFONT_MEDIUM_1];
 				gr_get_string_size(&filenames[i*14], &w, &h, &aw  );
-				gr_rect( 50, y-1, 198, y+11 );
-				gr_string( 55, y, (&filenames[i*14])+((player_mode && filenames[i*14]=='$')?1:0)  );
+				gr_rect( 50+offset, y-1, 198, y+11 );
+				gr_string( 55+offset, y, (&filenames[i*14])+((player_mode && filenames[i*14]=='$')?1:0)  );
 			}
 			i = citem;
 			if ( (i>=0) && (i<NumFiles) )	{
@@ -2344,8 +2352,8 @@ ReadFileNames:
 				else	
 					grd_curcanv->cv_font = Gamefonts[GFONT_MEDIUM_1];
 				gr_get_string_size(&filenames[i*14], &w, &h, &aw  );
-				gr_rect( 50, y-1, 198, y+11 );
-				gr_string( 55, y, (&filenames[i*14])+((player_mode && filenames[i*14]=='$')?1:0)  );
+				gr_rect( 50+offset, y-1, 198, y+11 );
+				gr_string( 55+offset, y, (&filenames[i*14])+((player_mode && filenames[i*14]=='$')?1:0)  );
 			}
 		}
 		bitblt_to_screen();

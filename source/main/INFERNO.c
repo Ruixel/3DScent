@@ -1704,8 +1704,8 @@ int main(int argc,char **argv)
 
 	if (!Auto_demo) 	{
 		key_flush();
-		strcpy(Players[Player_num].callsign, "PLAYER");
-		//RegisterPlayer();		//get player's name
+		//strcpy(Players[Player_num].callsign, "PLAYER");
+		RegisterPlayer();		//get player's name
 	}
 
 

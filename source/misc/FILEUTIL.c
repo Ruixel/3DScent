@@ -116,7 +116,8 @@ dir_t *dir_find (const char *ext)
 {
 	dir_t	*dir = malloc (sizeof (dir_t));
 
-	dir->dir = (struct DIR_ITER *)opendir (".");
+  // TODO: wew
+	dir->dir = (struct DIR_ITER *)opendir ("sdmc:/3dscent/");
 	strncpy (dir->ext, ext, 3);
 	dir->ext[3] = 0;
 
@@ -129,17 +130,40 @@ const char *dir_findnext (dir_t *dir)
 	struct stat	filestat;
 	int		len;
 
-	/*while (!dirnext ((DIR_ITER *)dir->dir, filename, &filestat))
-	{
-		if (!S_ISREG(filestat.st_mode))
-			continue;
-		len = strlen (filename);
-		if (!strnicmp (filename + (len - 3), dir->ext, 3))
-			return filename;
-	}*/
+	//while (!dirnext ((DIR_ITER *)dir->dir, filename, &filestat))
+	//{
+	//	if (!S_ISREG(filestat.st_mode))
+	//		continue;
+	//	len = strlen (filename);
+  //  printf("dir_findnext: found file %s\n", filename);
+	//	if (!strnicmp (filename + (len - 3), dir->ext, 3))
+	//		return filename;
+	//}
+  //
+
+  struct dirent* dp;
+
+  while (1) {
+    if ((dp = readdir((DIR_ITER *)dir->dir)) == 0)
+      break;
+    if (dp->d_name[0] == 0)
+      break;
+    if (stat(dp->d_name, &filestat) != 0)
+      continue;
+    if (!S_ISREG(filestat.st_mode))
+      continue;
+    len = strlen(dp->d_name);
+    // need to fit in filename[14]
+    if (len >= 14)
+      continue;
+    if (!strnicmp(dp->d_name + (len - 3), dir->ext, 3)) {
+      return dp->d_name;
+    }
+  }
+  printf("extension %s not found\n", dir->ext);
 
 
-
+  printf("dir_findnext: no more files\n");
 	return NULL;
 }
 
