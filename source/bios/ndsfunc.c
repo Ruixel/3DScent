@@ -1630,21 +1630,52 @@ static const tex_vertex quad_list[] = {
 static C3D_Tex back_tex;
 static void*   tex_buf;
 
+static u8 swizzle_lut[64];  // maps py*8+px -> z
+static bool swizzle_lut_init = false;
+
+static void init_swizzle_lut(void) {
+    for (int py = 0; py < 8; py++) {
+        for (int px = 0; px < 8; px++) {
+            int z = (px & 1)        | ((py & 1) << 1) |
+                    ((px & 2) << 1) | ((py & 2) << 2) |
+                    ((px & 4) << 2) | ((py & 4) << 3);
+            swizzle_lut[py * 8 + px] = z;
+        }
+    }
+    swizzle_lut_init = true;
+}
+
 static void tex_upload_software(C3D_Tex* tex,
                                 const u32* src_linear, int src_stride,
                                 int src_w, int src_h, int tex_w)
 {
+    if (!swizzle_lut_init) init_swizzle_lut();
+
     u32* dst = (u32*)tex->data;
     int tiles_per_row = tex_w / 8;
 
-    for (int y = 0; y < src_h; y++) {
-        for (int x = 0; x < src_w; x++) {
-            int px = x & 7, py = y & 7;
-            int z = (px & 1)        | ((py & 1) << 1) |
-                    ((px & 2) << 1) | ((py & 2) << 2) |
-                    ((px & 4) << 2) | ((py & 4) << 3);
-            int tile_idx = (y / 8) * tiles_per_row + (x / 8);
-            dst[tile_idx * 64 + z] = src_linear[y * src_stride + x];
+    // Iterate in tile order — better cache behavior on dst
+    int tiles_y = src_h / 8;
+    int tiles_x = src_w / 8;
+
+    for (int ty = 0; ty < tiles_y; ty++) {
+        for (int tx = 0; tx < tiles_x; tx++) {
+            u32* tile_dst = dst + (ty * tiles_per_row + tx) * 64;
+            const u32* tile_src = src_linear + (ty * 8) * src_stride + (tx * 8);
+
+            // Unroll the 8×8 tile
+            for (int py = 0; py < 8; py++) {
+                const u32* row_src = tile_src + py * src_stride;
+                const u8* lut_row = &swizzle_lut[py * 8];
+                tile_dst[lut_row[0]] = row_src[0];
+                tile_dst[lut_row[1]] = row_src[1];
+                tile_dst[lut_row[2]] = row_src[2];
+                tile_dst[lut_row[3]] = row_src[3];
+                tile_dst[lut_row[4]] = row_src[4];
+                tile_dst[lut_row[5]] = row_src[5];
+                tile_dst[lut_row[6]] = row_src[6];
+                tile_dst[lut_row[7]] = row_src[7];
+            }
         }
     }
     C3D_TexFlush(tex);
@@ -1835,6 +1866,7 @@ void bitblt_to_screen(void)
     }
 
     C3D_FrameEnd(0);
+    gspWaitForVBlank();
 
     // Reset world buffer for next frame
     world_frame_begin();
