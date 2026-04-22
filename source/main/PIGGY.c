@@ -892,32 +892,19 @@ void adpcm_coder(char *indata, ubyte *outdata, int len);
 
 void piggy_sound_page_in( int sound )
 {
-#if 0
 	digi_sound *snd = &GameSounds[sound];
 	int	i;
 
 	if (snd->data)
 		return;
 	cfseek( Piggy_fp, SoundOffset[sound], SEEK_SET );
-	snd->data = malloc (snd->length);
+	//snd->data = malloc (snd->length);
+  printf("Allocating %d bytes for sound %d\n", snd->length, sound);
+  printf("Remaining heap space is %d bytes\n", linearSpaceFree());
+  snd->data = linearAlloc(snd->length);
 	cfread( snd->data, snd->length, 1, Piggy_fp );
 	for (i=0; i<snd->length; i++)
 		snd->data[i] -= 0x80;
-#else
-	digi_sound *snd = &GameSounds[sound];
-	char	*buffer;
-
-	if (snd->data)
-		return;
-
-	cfseek( Piggy_fp, SoundOffset[sound], SEEK_SET );
-	buffer = malloc (snd->length);
-	cfread( buffer, snd->length, 1, Piggy_fp );
-	snd->data = malloc ((snd->length >> 1) + 4);
-	adpcm_coder (buffer, snd->data, snd->length);
-	free (buffer);
-	DC_FlushRange (snd->data, (snd->length >> 1) + 4);
-#endif
 }
 
 void piggy_bitmap_set_flag( bitmap_index bitmap )
@@ -1064,7 +1051,7 @@ void piggy_bitmap_page_out_all()
 	for (i=0; i<Num_sound_files; i++)
 	{
 		if (GameSounds[i].data)
-			free (GameSounds[i].data);
+			linearFree (GameSounds[i].data);
 		GameSounds[i].data = NULL;
 	}
 

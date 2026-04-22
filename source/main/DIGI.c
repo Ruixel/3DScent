@@ -13,6 +13,7 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "ndsw.h"
 
@@ -96,6 +97,150 @@ typedef struct sound_object {
 sound_object SoundObjects[MAX_SOUND_OBJECTS];
 short next_signature=0;
 
+#define SND_MAX_CHANNELS	16
+#define SOUND_FREQ(hz)		(hz)
+
+static ndspWaveBuf snd_wavebufs[SND_MAX_CHANNELS];
+static ubyte snd_channel_used[SND_MAX_CHANNELS];
+static float snd_channel_vol[SND_MAX_CHANNELS];
+static int snd_channel_pan[SND_MAX_CHANNELS];
+static float snd_master_vol = 1.0f;
+
+static float snd_vol_to_float(int v)
+{
+	if (v < 0) v = 0;
+	if (v > 127) v = 127;
+	return (float)v / 127.0f;
+}
+
+static void snd_apply_mix(int chn)
+{
+	float vol, right, left;
+	float mix[12];
+	int i;
+
+	vol = snd_channel_vol[chn] * snd_master_vol;
+	right = (float)snd_channel_pan[chn] / 127.0f;
+	if (right < 0.0f) right = 0.0f;
+	if (right > 1.0f) right = 1.0f;
+	left = 1.0f - right;
+
+	for (i = 0; i < 12; i++) mix[i] = 0.0f;
+	mix[0] = vol * left;
+	mix[1] = vol * right;
+	ndspChnSetMix(chn, mix);
+}
+
+void Snd_Init()
+{
+	int i;
+
+	ndspInit();
+	ndspSetOutputMode(NDSP_OUTPUT_STEREO);
+	ndspSetMasterVol(1.0f);
+
+	for (i = 0; i < SND_MAX_CHANNELS; i++) {
+		snd_wavebufs[i].status = NDSP_WBUF_DONE;
+		snd_channel_used[i] = 0;
+		snd_channel_vol[i] = 1.0f;
+		snd_channel_pan[i] = 64;
+		ndspChnReset(i);
+	}
+}
+
+void Snd_Exit()
+{
+	Snd_StopAllChannels();
+	ndspExit();
+}
+
+int Snd_GetFreeChannel()
+{
+	int i;
+
+	for (i = 0; i < SND_MAX_CHANNELS; i++) {
+		if (!snd_channel_used[i])
+			return i;
+		if (snd_wavebufs[i].status == NDSP_WBUF_DONE) {
+			snd_channel_used[i] = 0;
+			return i;
+		}
+	}
+	return -1;
+}
+
+void Snd_StartChannel(int chn, u32 data, int length, int freq, int volume, int unk1, int pan, int format, int loop, int unk2)
+{
+	ndspWaveBuf *buf;
+
+  //printf("Snd_StartChannel: chn=%d data=%08X length=%d freq=%d volume=%d pan=%d format=%d loop=%d\n",
+          //chn, data, length, freq, volume, pan, format, loop);
+
+  //length = length * 8; // Convert from samples to bytes (since we're using PCM8 format)
+
+	if (chn < 0 || chn >= SND_MAX_CHANNELS) return;
+	if (!data || length <= 0) return;
+
+	ndspChnWaveBufClear(chn);
+	ndspChnSetFormat(chn, NDSP_FORMAT_MONO_PCM8);
+	ndspChnSetRate(chn, (float)freq);
+	ndspChnSetInterp(chn, NDSP_INTERP_LINEAR);
+
+	snd_channel_vol[chn] = snd_vol_to_float(volume);
+	snd_channel_pan[chn] = pan;
+	snd_apply_mix(chn);
+
+	buf = &snd_wavebufs[chn];
+	memset(buf, 0, sizeof(*buf));
+	buf->data_vaddr = (void *)data;
+	buf->nsamples = length;
+	buf->looping = (loop != 0);
+	buf->status = NDSP_WBUF_FREE;
+
+	//DSP_FlushDataCache((void *)data, length);
+  DSP_FlushDataCache((void *)data, (length + 31) & ~31);
+	ndspChnWaveBufAdd(chn, buf);
+	snd_channel_used[chn] = 1;
+}
+
+void Snd_StopChannel(int chn)
+{
+	if (chn < 0 || chn >= SND_MAX_CHANNELS) return;
+	ndspChnWaveBufClear(chn);
+	snd_channel_used[chn] = 0;
+}
+
+void Snd_StopAllChannels()
+{
+	int i;
+	for (i = 0; i < SND_MAX_CHANNELS; i++)
+		Snd_StopChannel(i);
+}
+
+void Snd_ChangeVolume(int chn, int volume)
+{
+	if (chn < 0 || chn >= SND_MAX_CHANNELS) return;
+	snd_channel_vol[chn] = snd_vol_to_float(volume);
+	snd_apply_mix(chn);
+}
+
+void Snd_ChangePan(int chn, int pan)
+{
+	if (chn < 0 || chn >= SND_MAX_CHANNELS) return;
+	snd_channel_pan[chn] = pan;
+	snd_apply_mix(chn);
+}
+
+void Snd_ChangeMasterVolume(int volume)
+{
+	int i;
+	snd_master_vol = snd_vol_to_float(volume);
+	for (i = 0; i < SND_MAX_CHANNELS; i++) {
+		if (snd_channel_used[i])
+			snd_apply_mix(i);
+	}
+}
+
 void channel_start_sound (int c, int sndnum, int volume, int pan, int loop)
 {
 	digi_sound	*snd;
@@ -107,7 +252,8 @@ void channel_start_sound (int c, int sndnum, int volume, int pan, int loop)
 	if (!snd->data)
 		piggy_sound_page_in (sndnum);
 
-	//Snd_StartChannel (c, (u32)snd->data, snd->length >> 3, SOUND_FREQ (11025), volume, 0, (pan + 256) >> 2, 2, loop, 4);
+
+	Snd_StartChannel (c, (u32)snd->data, snd->length, SOUND_FREQ (11025), volume, 0, (pan + 256) >> 2, 2, loop, 4);
 }
 
 void channel_stop (int c)
@@ -115,7 +261,7 @@ void channel_stop (int c)
 	if (c < 0)
 		return;
 
-	//Snd_StopChannel (c);
+	Snd_StopChannel (c);
 }
 
 void channel_change_volume (int c, int volume)
@@ -124,7 +270,7 @@ void channel_change_volume (int c, int volume)
 	if (c < 0)
 		return;
 
-	//Snd_ChangeVolume (c, volume);
+	Snd_ChangeVolume (c, volume);
 }
 
 void channel_change_pan (int c, int pan)
@@ -132,7 +278,7 @@ void channel_change_pan (int c, int pan)
 	if (c < 0)
 		return;
 
-	//Snd_ChangePan (c, (pan + 256) >> 2);
+	Snd_ChangePan (c, (pan + 256) >> 2);
 }
 
 void digi_reset_digi_sounds()
@@ -140,7 +286,7 @@ void digi_reset_digi_sounds()
 	if ( !digi_initialized )
 		return;
 
-	//Snd_StopAllChannels ();
+	Snd_StopAllChannels ();
 }
 
 int digi_xlat_sound( int soundno )
@@ -177,9 +323,11 @@ void digi_play_sample_3d( int sndnum, int angle, int volume, int no_dups )
 
 	vol = fixmuldiv(volume, digi_volume, F1_0);
 
-	c = -1;//Snd_GetFreeChannel ();
+	c = Snd_GetFreeChannel ();
 	if (c == -1)
 		return;
+
+  printf("Playing sound %d (mapped to %d) at volume %d and angle %d on channel %d\n", sndnum, i, vol, angle, c);
 	channel_start_sound (c, i, vol, angle, 0);
 }
 
@@ -203,7 +351,7 @@ void digi_play_sample( int sndnum, fix max_volume )
 
 	vol = fixmuldiv(max_volume, digi_volume, F1_0);
 
-	c = -1;//Snd_GetFreeChannel ();
+	c = Snd_GetFreeChannel ();
 	if (c == -1)
 		return;
 	channel_start_sound (c, i, vol, 0, 0);
@@ -289,7 +437,7 @@ void digi_set_master_volume( int volume )
 	else
 		Config_master_volume = volume;	
 
-	//Snd_ChangeMasterVolume (volume * _DIGI_MAX_VOLUME / 8);
+	Snd_ChangeMasterVolume (volume * _DIGI_MAX_VOLUME / 8);
 }
 
 void digi_reset()
@@ -331,7 +479,7 @@ void digi_stop_all()
 
 	if (!digi_initialized)	return;
 
-	//Snd_StopAllChannels ();
+	Snd_StopAllChannels ();
 
 	for (i=0, sndobj=SoundObjects; i<MAX_SOUND_OBJECTS; i++ , sndobj++)
 		sndobj->flags = 0;
@@ -348,7 +496,7 @@ void digi_start_sound_object(int i)
 
 	if (!digi_initialized) return;
 
-	c = -1;//Snd_GetFreeChannel ();
+	c = Snd_GetFreeChannel ();
 	if (c == -1)
 		return;
 
@@ -667,11 +815,12 @@ void digi_init_sounds()
 {
 	if (!digi_initialized)
 		return;
-	//Snd_StopAllChannels ();
+	Snd_StopAllChannels ();
 }
 
 int digi_init()
 {
+  Snd_Init();
  	digi_initialized = 1;
 
 	digi_set_master_volume(Config_master_volume);
