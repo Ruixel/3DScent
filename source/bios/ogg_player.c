@@ -27,9 +27,7 @@
 
 // ---- DEFINITIONS ----
 
-static const char *PATH = "romfs:/sample.ogg";  // Path to Ogg Vorbis file to play
-
-static const int THREAD_AFFINITY = 1;           // Execute thread on any core
+static const int THREAD_AFFINITY = -1;           // Execute thread on any core
 static const int THREAD_STACK_SZ = 32 * 1024;    // 32kB stack for audio thread
 
 const Thread threadId;
@@ -327,6 +325,7 @@ void initOggPlayer(void) {
     ndspSetCallback(audioCallback, NULL);
 
     // Spawn audio thread
+    //APT_SetAppCpuTimeLimit(30); // Bad idea i think
 
     // Set the thread priority to the main thread's priority ...
     int32_t priority = 0x30;
