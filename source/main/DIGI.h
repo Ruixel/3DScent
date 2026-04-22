@@ -151,6 +151,7 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
 #ifndef _DIGI_H
 #define _DIGI_H
 
+#include "miniz.h"
 #include "types.h"
 #include "vecmat.h"
 
@@ -158,6 +159,13 @@ typedef struct digi_sound 	{
 	int length;
 	ubyte * data;
 } digi_sound;
+
+#define NUM_SONGS 64
+struct MusicLibrary{
+  mz_zip_archive zip;
+  bool loaded;
+  char *song_names[NUM_SONGS];
+};
 
 extern int digi_driver_board;
 extern int digi_driver_port;

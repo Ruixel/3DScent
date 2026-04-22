@@ -17,6 +17,7 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
 
 #include "ndsw.h"
 
+#include "miniz.h"
 #include "inferno.h"
 #include "songs.h"
 #include "screens.h"
@@ -34,6 +35,7 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
 #include "error.h"
 #include "kconfig.h"
 #include "newdemo.h"
+#include "ogg_player.h"
 
 #include "ndsfunc.h"
 //#include "sound.h"
@@ -105,6 +107,9 @@ static ubyte snd_channel_used[SND_MAX_CHANNELS];
 static float snd_channel_vol[SND_MAX_CHANNELS];
 static int snd_channel_pan[SND_MAX_CHANNELS];
 static float snd_master_vol = 1.0f;
+
+#define DXA_PATH "sdmc:/3dscent/music.dxa"
+static struct MusicLibrary music_library = {0};
 
 static float snd_vol_to_float(int v)
 {
@@ -327,7 +332,6 @@ void digi_play_sample_3d( int sndnum, int angle, int volume, int no_dups )
 	if (c == -1)
 		return;
 
-  printf("Playing sound %d (mapped to %d) at volume %d and angle %d on channel %d\n", sndnum, i, vol, angle, c);
 	channel_start_sound (c, i, vol, angle, 0);
 }
 
@@ -387,6 +391,16 @@ void digi_play_midi_song(int songnum, int loop )
 //	song_resource *song;
 
 	if (!digi_initialized) return;
+  if (!music_library.loaded) return;
+
+  printf("digi_play_midi_song: songnum=%d loop=%d\n", songnum, loop);
+  char* filename = music_library.song_names[songnum];
+  printf("Playing song: %s\n", filename);
+  if (!filename) {
+    printf("Error: No filename for songnum %d\n", songnum);
+    return;
+  }
+
 
 	digi_last_midi_song = songnum;
 	digi_last_midi_song_loop = loop;
@@ -397,6 +411,8 @@ void digi_play_midi_song(int songnum, int loop )
 		return;
 
 	digi_midi_song_playing = 1;
+
+  load_ogg_from_music_library(&music_library, filename);
 }
 
 void digi_set_midi_volume(int n)
@@ -801,7 +817,8 @@ void digi_kill_sound_linked_to_object( int objnum )
 		mprintf( (1, "ERROR: More than 1 sounds were deleted from object %d\n", objnum ));
 	}
 }
-/*
+
+// TODO: Needs calling
 void digi_close()
 {
 	if (!digi_initialized)
@@ -809,8 +826,10 @@ void digi_close()
 	digi_stop_current_song();
 
 	digi_initialized = 0;
+
+  shutdownOggPlayer();
 }
-*/
+
 void digi_init_sounds()
 {
 	if (!digi_initialized)
@@ -818,10 +837,64 @@ void digi_init_sounds()
 	Snd_StopAllChannels ();
 }
 
+bool load_song_list(struct MusicLibrary *lib) {
+  size_t size = 0;
+  char *data = mz_zip_reader_extract_file_to_heap(&lib->zip, "descent.sng", &size, 0);
+  if (!data) {
+      printf("descent.sng not found in DXA archive\n");
+      return false;
+  }
+
+  char *ptr = data;
+  int index = 0;
+  while (ptr < data + size && index < NUM_SONGS) {
+    // Each song name is stored as a line
+    char *newline = strchr(ptr, '\n');
+    if (!newline) {
+      if (strlen(ptr) == 0) {
+        // No more songs
+        break;
+      }
+      lib->song_names[index++] = strndup(ptr, size - (ptr - data));
+      break;
+    } else {
+      lib->song_names[index++] = strndup(ptr, newline - ptr);
+      printf("Loaded song %d: %s\n", index, lib->song_names[index]);
+      ptr = newline + 1;
+    }
+  }
+
+  free(data);
+  return true;
+}
+
 int digi_init()
 {
   Snd_Init();
  	digi_initialized = 1;
+
+  // Open up my dxa file :3
+  if (!mz_zip_reader_init_file(&music_library.zip, DXA_PATH, 0)) {
+    printf("Could not find music dxa at %s\n", DXA_PATH);
+    printf("Music will not play. :(\n");
+    printf("Error: %s\n", mz_zip_get_error_string(mz_zip_get_last_error(&music_library.zip)));
+  } else {
+    if (!load_song_list(&music_library)) {
+      printf("Failed to load song list from dxa\n");
+      mz_zip_reader_end(&music_library.zip);
+    } else {
+      music_library.loaded = true;
+      printf("Music library loaded from %s\n", DXA_PATH);
+      printf("Music library contains %u files\n", mz_zip_reader_get_num_files(&music_library.zip));
+
+      printf("Songs:\n");
+      for (int i = 0; i < NUM_SONGS && music_library.song_names[i]; i++) {
+        printf("  %d: %s\n", i, music_library.song_names[i]);
+      }
+
+      initOggPlayer();
+    }
+  }
 
 	digi_set_master_volume(Config_master_volume);
 	digi_set_volume(digi_volume, midi_volume);
