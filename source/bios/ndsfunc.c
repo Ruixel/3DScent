@@ -1776,25 +1776,62 @@ static void draw_screen_contents(void)
     C3D_DrawArrays(GPU_TRIANGLES, 0, quad_list_count);
 }
 
+static u32 packed_palette[256];
+static u8 last_palette[768];  // 256 * 3
+static bool palette_dirty = true;
+
+// Call this when the palette changes (or just every frame — it's 256 iters):
+static void update_packed_palette(void) {
+    extern ubyte gr_current_pal[];
+    if (memcmp(last_palette, gr_current_pal, 768) == 0) return;  // unchanged
+    memcpy(last_palette, gr_current_pal, 768);
+    
+    for (int i = 0; i < 256; i++) {
+        u8 r = gr_current_pal[i*3+0] << 2;
+        u8 g = gr_current_pal[i*3+1] << 2;
+        u8 b = gr_current_pal[i*3+2] << 2;
+        u8 a = (i == 0) ? 0x00 : 0xFF;
+        packed_palette[i] = ((u32)r << 24) | ((u32)g << 16) | ((u32)b << 8) | a;
+    }
+}
+
 void bitblt_to_screen(void)
 {
+    u64 t0, t1, t2, t3, t4, t5;
+    t0 = svcGetSystemTick();
     hidScanInput();
     keyboard_handler();
 
 #if RENDER_MODE == RENDER_MODE_BITBLT
-    extern ubyte gr_current_pal[];
-    for (int y = 0; y < UPLOAD_H; y++) {
-        const u8* src = back_buffer + y * 320;
-        u32*      dst = (u32*)tex_buf + y * TEX_W;
-        for (int x = 0; x < 320; x++) {
-            u8 idx = src[x];
-            u8 r = gr_current_pal[idx * 3 + 0] << 2;
-            u8 g = gr_current_pal[idx * 3 + 1] << 2;
-            u8 b = gr_current_pal[idx * 3 + 2] << 2;
-            u8 a = (idx == 0) ? 0x00 : 0xFF;
-            dst[x] = ((u32)r << 24) | ((u32)g << 16) | ((u32)b << 8) | a;
-        }
+  update_packed_palette();
+    if (!swizzle_lut_init) init_swizzle_lut();
+
+    u32* dst = (u32*)back_tex.data;
+    int tiles_per_row = 512 / 8;
+
+    // Iterate in tile order — better cache behavior on dst
+    int tiles_y = UPLOAD_H / 8;
+    int tiles_x = GAME_W / 8;
+  for (int ty = 0; ty < 200 / 8; ty++) {
+    for (int tx = 0; tx < 320 / 8; tx++) {
+      u32* tile_dst = dst + (ty * tiles_per_row + tx) * 64;
+      const u8* tile_src = back_buffer + (ty * 8) * 320 + (tx * 8);
+      
+      for (int py = 0; py < 8; py++) {
+        const u8* row_src = tile_src + py * 320;
+        const u8* lut_row = &swizzle_lut[py * 8];
+        tile_dst[lut_row[0]] = packed_palette[row_src[0]];
+        tile_dst[lut_row[1]] = packed_palette[row_src[1]];
+        tile_dst[lut_row[2]] = packed_palette[row_src[2]];
+        tile_dst[lut_row[3]] = packed_palette[row_src[3]];
+        tile_dst[lut_row[4]] = packed_palette[row_src[4]];
+        tile_dst[lut_row[5]] = packed_palette[row_src[5]];
+        tile_dst[lut_row[6]] = packed_palette[row_src[6]];
+        tile_dst[lut_row[7]] = packed_palette[row_src[7]];
+      }
     }
+  }
+C3D_TexFlush(&back_tex);
 #elif RENDER_MODE == RENDER_MODE_SOLID
     u32* p = (u32*)tex_buf;
     for (int i = 0; i < TEX_W * TEX_H; i++) p[i] = 0xFF0000FF;
@@ -1813,7 +1850,8 @@ void bitblt_to_screen(void)
 #endif
 
 #if RENDER_MODE != RENDER_MODE_RAW_WRITE
-    tex_upload_software(&back_tex, (u32*)tex_buf, TEX_W, GAME_W, UPLOAD_H, TEX_W);
+    t1 = svcGetSystemTick();
+    //tex_upload_software(&back_tex, (u32*)tex_buf, TEX_W, GAME_W, UPLOAD_H, TEX_W);
 #endif
 
     // ----- Stereo 3D support -----
@@ -1821,6 +1859,7 @@ void bitblt_to_screen(void)
     // it to an interocular distance (IOD). The /3 divisor matches the
     // citro3d sample's "tame the effect" tweak — full slider produces a
     // comfortable depth feel without too much eye strain.
+    t2 = svcGetSystemTick();
     float slider = osGet3DSliderState();
     float iod = slider / 3.0f;
     bool stereo = (iod > 0.0f);
@@ -1845,7 +1884,8 @@ void bitblt_to_screen(void)
     // every frame; if GPU is still reading it during next frame's CPU
     // write, we'd see tearing in the bitblt area. If that happens, we
     // need to double-buffer back_tex.
-    C3D_FrameBegin(0);
+    t3 = svcGetSystemTick();
+    C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
 
     // ----- Left eye (always drawn) -----
     C3D_RenderTargetClear(target_left, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
@@ -1854,7 +1894,8 @@ void bitblt_to_screen(void)
     world_build_projection(stereo ? -iod : 0.0f);  // negative iod = left eye
 #endif
     draw_screen_contents();
-
+    
+    t4 = svcGetSystemTick();
     // ----- Right eye (only if slider engaged) -----
     if (stereo) {
         C3D_RenderTargetClear(target_right, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
@@ -1866,10 +1907,20 @@ void bitblt_to_screen(void)
     }
 
     C3D_FrameEnd(0);
-    gspWaitForVBlank();
+    t5 = svcGetSystemTick();
 
     // Reset world buffer for next frame
     world_frame_begin();
+
+    // printf("init %f ms, upload %f ms, pre-draw %f ms, draw(left) %f ms, draw(right) %f ms, cleanup %f ms\n",
+    //        (t1 - t0) / (double)CPU_TICKS_PER_MSEC,
+    //         (t2 - t1) / (double)CPU_TICKS_PER_MSEC,
+    //         (t3 - t2) / (double)CPU_TICKS_PER_MSEC,
+    //         (t4 - t3) / (double)CPU_TICKS_PER_MSEC,
+    //         (t5 - t4) / (double)CPU_TICKS_PER_MSEC,
+    //         (svcGetSystemTick() - t5) / (double)CPU_TICKS_PER_MSEC);
+
+
 }
 
 #endif // RENDER_MODE branch
