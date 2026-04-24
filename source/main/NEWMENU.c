@@ -1411,7 +1411,8 @@ int newmenu_do4( char * title, char * subtitle, int nitems, newmenu_item * item,
 		switch( k )	{
 		case KEY_TAB + KEY_SHIFTED:
 		case KEY_UP:
-		case KEY_PAD8:
+    case KEY_CSTICK_UP:
+    case KEY_CPAD_UP:
 			if (all_text) break;
 			do {
 				choice--;
@@ -1431,7 +1432,8 @@ int newmenu_do4( char * title, char * subtitle, int nitems, newmenu_item * item,
 			break;
 		case KEY_TAB:
 		case KEY_DOWN:
-		case KEY_PAD2:
+    case KEY_CSTICK_DOWN:
+    case KEY_CPAD_DOWN:
 			if (all_text) break;
 			do {
 				choice++;
@@ -1717,7 +1719,7 @@ int newmenu_do4( char * title, char * subtitle, int nitems, newmenu_item * item,
 			unsigned char ascii;
 
 			 if ( ((item[choice].type==NM_TYPE_INPUT)||((item[choice].type==NM_TYPE_INPUT_MENU)&&(item[choice].group==1)) )&& (old_choice==choice) )	{
-			 	if ( k==KEY_LEFT || k==KEY_BACKSP || k==KEY_PAD4 )	{
+			 	if ( k==KEY_LEFT || k==KEY_BACKSP || k==KEY_CPAD_LEFT || k==KEY_CSTICK_LEFT )	{
 			 		if (item[choice].value==-1) item[choice].value = strlen(item[choice].text);
 			 		if (item[choice].value > 0)
 			 			item[choice].value--;
@@ -1778,7 +1780,8 @@ int newmenu_do4( char * title, char * subtitle, int nitems, newmenu_item * item,
 			if ( (item[choice].type==NM_TYPE_NUMBER) || (item[choice].type==NM_TYPE_SLIDER)) 	{
 				int ov=item[choice].value;
 				switch( k ) {
-				case KEY_PAD4:
+          case KEY_CSTICK_LEFT:
+          case KEY_CPAD_LEFT:
 			  	case KEY_LEFT:
 			  	case KEY_MINUS:
 				case KEY_MINUS+KEY_SHIFTED:
@@ -1786,20 +1789,19 @@ int newmenu_do4( char * title, char * subtitle, int nitems, newmenu_item * item,
 					item[choice].value -= 1;
 					break;
 			  	case KEY_RIGHT:
-				case KEY_PAD6:
+				case KEY_CPAD_RIGHT:
+        case KEY_CSTICK_RIGHT:
 			  	case KEY_EQUAL:
 				case KEY_EQUAL+KEY_SHIFTED:
 				case KEY_PADPLUS:
 					item[choice].value++;
 					break;
 				case KEY_PAGEUP:
-				case KEY_PAD9:
 				case KEY_SPACEBAR:
 					item[choice].value += 10;
 					break;
 				case KEY_PAGEDOWN:
 				case KEY_BACKSP:
-				case KEY_PAD3:
 					item[choice].value -= 10;
 					break;
 				}
@@ -2194,27 +2196,25 @@ ReadFileNames:
 			break;
 #endif
 		case KEY_HOME:
-		case KEY_PAD7:
 			citem = 0;
 			break;
 		case KEY_END:
-		case KEY_PAD1:
 			citem = NumFiles-1;
 			break;
 		case KEY_UP:
-		case KEY_PAD8:
+		case KEY_CPAD_UP:
+    case KEY_CSTICK_UP:
 			citem--;			
 			break;
 		case KEY_DOWN:
-		case KEY_PAD2:
+		case KEY_CSTICK_DOWN:
+    case KEY_CPAD_DOWN:
 			citem++;			
 			break;
  		case KEY_PAGEDOWN:
-		case KEY_PAD3:
 			citem += NumFiles_displayed;
 			break;
 		case KEY_PAGEUP:
-		case KEY_PAD9:
 			citem -= NumFiles_displayed;
 			break;
 		case KEY_B:
@@ -2501,27 +2501,25 @@ int newmenu_listbox1( char * title, int nitems, char * items[], int allow_abort_
 			save_screen_shot(0); 
 			break;
 		case KEY_HOME:
-		case KEY_PAD7:
 			citem = 0;
 			break;
 		case KEY_END:
-		case KEY_PAD1:
 			citem = nitems-1;
 			break;
 		case KEY_UP:
-		case KEY_PAD8:
+		case KEY_CSTICK_UP:
+    case KEY_CPAD_UP:
 			citem--;			
 			break;
 		case KEY_DOWN:
-		case KEY_PAD2:
+    case KEY_CSTICK_DOWN:
+    case KEY_CPAD_DOWN:
 			citem++;			
 			break;
  		case KEY_PAGEDOWN:
-		case KEY_PAD3:
 			citem += LB_ITEMS_ON_SCREEN;
 			break;
 		case KEY_PAGEUP:
-		case KEY_PAD9:
 			citem -= LB_ITEMS_ON_SCREEN;
 			break;
 		case KEY_B:

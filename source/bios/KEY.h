@@ -251,6 +251,16 @@ void keyboard_handler();
 #define KEY_PADMULTIPLY 0x37
 #define KEY_PADENTER    0x9C
 
+#define KEY_CSTICK_UP         KEY_PAD0
+#define KEY_CSTICK_DOWN       KEY_PAD1
+#define KEY_CSTICK_LEFT       KEY_PAD2
+#define KEY_CSTICK_RIGHT      KEY_PAD3
+
+#define KEY_CPAD_UP           KEY_PAD6
+#define KEY_CPAD_DOWN         KEY_PAD7
+#define KEY_CPAD_LEFT         KEY_PAD8
+#define KEY_CPAD_RIGHT        KEY_PAD9
+
 #define KEY_INSERT      0xD2
 #define KEY_HOME        0xC7
 #define KEY_PAGEUP      0xC9

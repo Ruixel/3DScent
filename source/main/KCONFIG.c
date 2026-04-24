@@ -761,15 +761,33 @@ void kc_drawitem( kc_item *item, int is_current )
 
 //	if ( item->type == BT_KEY )
   // Using I and U for ZL and ZR internally
-  char temp[10];
-  strncpy(temp, btext, 10);
+  // Gee, I wonder if there's an easier way of doing this
   if (item->value == 23) {
     strncpy(btext, "ZL", 10);
   } else if (item->value == 22) {
     strncpy(btext, "ZR", 10);
+  } else if (item->value == 77) {
+    strncpy(btext, "C_Y+", 10);
+  } else if (item->value == 71) {
+    strncpy(btext, "C_Y-", 10);
+  } else if (item->value == 72) {
+    strncpy(btext, "C_X-", 10);
+  } else if (item->value == 73) {
+    strncpy(btext, "C_X+", 10);
+  } else if (item->value == 82) {
+    strncpy(btext, "P_Y+", 10);
+  } else if (item->value == 79) {
+    strncpy(btext, "P_Y-", 10);
+  } else if (item->value == 80) {
+    strncpy(btext, "P_X-", 10);
+  } else if (item->value == 81) {
+    strncpy(btext, "P_X+", 10);
+  } else if (item->value == 15) {
+    strncpy(btext, "SEL", 10);
   }
 
-  printf( "kc_drawitem: %s, item value = %d\n", btext, item->value );
+
+  printf( "kc_drawitem: %d, item value = %d\n", *btext, item->value );
 		gr_string( x, item->y, btext );
 //	else if ( (item->type == BT_JOY_AXIS) || (item->type == BT_MOUSE_AXIS) || (item->type == BT_INVERT) )
 //		gr_string(x, item->y - 164, btext);
@@ -1380,7 +1398,8 @@ void kconfig_sub(kc_item * items,int nitems, char * title)
 			kc_drawitem( &items[citem], 1 );
 			break;
 		case KEY_UP: 		
-		case KEY_PAD8:
+		case KEY_CSTICK_UP:
+    case KEY_CPAD_UP:
 #ifdef TABLE_CREATION
 			if (items[citem].u==-1) items[citem].u=find_next_item_up( items,nitems, citem);
 #endif
@@ -1400,7 +1419,8 @@ void kconfig_sub(kc_item * items,int nitems, char * title)
 				citem = items[citem].u;
 			break;
 		case KEY_DOWN: 	
-		case KEY_PAD2:
+		case KEY_CPAD_DOWN:
+		case KEY_CSTICK_DOWN:
 #ifdef TABLE_CREATION
 			if (items[citem].d==-1) items[citem].d=find_next_item_down( items,nitems, citem);
 #endif
@@ -1421,7 +1441,8 @@ void kconfig_sub(kc_item * items,int nitems, char * title)
 			break;
 		case KEY_SHIFTED + KEY_TAB:
 		case KEY_LEFT: 	
-		case KEY_PAD4:
+		case KEY_CSTICK_LEFT:
+		case KEY_CPAD_LEFT:
 #ifdef TABLE_CREATION
 			if (items[citem].l==-1) items[citem].l=find_next_item_left( items,nitems, citem);
 #endif
@@ -1442,7 +1463,8 @@ void kconfig_sub(kc_item * items,int nitems, char * title)
 			break;
 		case KEY_TAB:
 		case KEY_RIGHT: 	
-		case KEY_PAD6:
+		case KEY_CSTICK_RIGHT:
+    case KEY_CPAD_RIGHT:
 #ifdef TABLE_CREATION
 			if (items[citem].r==-1) items[citem].r=find_next_item_right( items,nitems, citem);
 #endif
@@ -1722,7 +1744,7 @@ void read_head_tracker()
 //#define MOUSE_READ_TIME		(F1_0/30)		// read mouse at 30 Hz
 //fix	LastReadTime = 0;
 
-//fix	joy_axis[4];
+fix	joy_axis[4];
 /*
 ubyte 			kc_use_external_control = 0;
 ubyte 			kc_external_intno = 0;
@@ -1843,6 +1865,14 @@ void controls_read_all()
 		use_joystick=0;
 	}
 */	
+
+  // JOY.C got obliterated from the previous fork so I'm just goin to be extremely lazy
+  // and just read the raw joystick values from the 3ds here
+
+  //joy_axis[0] = 0.5f;
+  //Controls.pitch_time += 300;
+
+
 //	if (Config_control_type==5 ) {
 
 #if 0
@@ -1897,7 +1927,6 @@ void controls_read_all()
 
 //------------ Read pitch_time -----------
 	if ( !slide_on )	{
-		// mprintf((0, "pitch: %7.3f %7.3f: %7.3f\n", f2fl(k4), f2fl(k6), f2fl(Controls.heading_time)));
 		kp = 0;
 
 		// From keyboard...
@@ -2335,6 +2364,8 @@ void controls_read_all()
 	if ( (Cruise_speed == i2f(100)) && (Controls.forward_thrust_time < FrameTime ) )
 		Int3();
 
+
+		//printf("pitch: %7.3d\n",  f2fl(Controls.pitch_time));
 //--------- Don't do anything if in debug mode
 	#ifndef NDEBUG
 	if ( keyd_pressed[KEY_DELETE] )	{
