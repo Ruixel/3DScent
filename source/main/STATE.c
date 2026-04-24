@@ -240,6 +240,7 @@ static char rcsid[] = "$Id: state.c 1.7 1995/10/31 10:18:25 allender Exp $";
 
 #include "mono.h"
 #include "inferno.h"
+#include "playsave.h"
 #include "segment.h"
 #include "textures.h"
 #include "wall.h"
@@ -623,6 +624,19 @@ int state_save_all(int between_levels)
 		return 0;
 	}
 		
+  if (strncmp( desc, TXT_EMPTY, strlen(TXT_EMPTY) ))	{
+    time_t now = time(NULL);
+    struct tm *t = localtime(&now);
+    
+    snprintf(desc, DESC_LENGTH, "%02d/%02d/%02d %02d:%02d:%02d",
+             t->tm_mday,
+             t->tm_mon + 1,        // tm_mon is 0-11
+             t->tm_year % 100,     // tm_year is years since 1900
+             t->tm_hour,
+             t->tm_min,
+             t->tm_sec);
+  }
+  printf("Should save game to %s with description '%s'\n", filename, desc );
 	return state_save_all_sub(filename, desc, between_levels);
 }
 
@@ -806,6 +820,7 @@ int state_save_all_sub(char *filename, char *desc, int between_levels)
 
 	fclose(fp);
 	
+  write_player_file();
 	start_time();
 
 	return 1;
