@@ -21,13 +21,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
 #include <string.h>
 
 #include "digi.h"
 
 // ---- DEFINITIONS ----
 
-static const int THREAD_AFFINITY = -1;           // Execute thread on any core
+static int THREAD_AFFINITY = -1;           // Execute thread on any core
 static const int THREAD_STACK_SZ = 32 * 1024;    // 32kB stack for audio thread
 
 const Thread threadId;
@@ -91,20 +93,6 @@ const char *vorbisStrError(int error)
                    "requested on an unseekable stream.";
         default:
             return "Unknown error.";
-    }
-}
-
-// Pause until user presses a button
-void waitForInput(void) {
-    printf("Press any button to exit...\n");
-    while(aptMainLoop())
-    {
-        gspWaitForVBlank();
-        gfxSwapBuffers();
-        hidScanInput();
-
-        if(hidKeysDown())
-            break;
     }
 }
 
@@ -303,6 +291,8 @@ bool load_ogg_from_music_library(struct MusicLibrary *library, char *fileName) {
         return false;
     }
 
+    if (s_threadId == 0) {
+
     int32_t priority = 0x30;
     svcGetThreadPriority(&priority, CUR_THREAD_HANDLE);
     priority -= 1;
@@ -312,12 +302,23 @@ bool load_ogg_from_music_library(struct MusicLibrary *library, char *fileName) {
     s_threadId = threadCreate(audioThread, &s_vorbisFile,
                               THREAD_STACK_SZ, priority,
                               THREAD_AFFINITY, false);
+    }
+
     s_oggLoaded = true;
     return true;
 }
 
 
 void initOggPlayer(void) {
+    // Check if old 3ds 
+    bool isNew3ds;
+    APT_CheckNew3DS(&isNew3ds);
+
+    if (!isNew3ds) {
+      APT_SetAppCpuTimeLimit(30); // Core 1 
+      THREAD_AFFINITY = 1;
+    } 
+
     // Setup LightEvent for synchronisation of audioThread
     LightEvent_Init(&s_event, RESET_ONESHOT);
 
