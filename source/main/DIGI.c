@@ -412,7 +412,7 @@ void digi_play_midi_song(int songnum, int loop )
 
 	digi_midi_song_playing = 1;
 
-  load_ogg_from_music_library(&music_library, filename);
+  load_ogg_from_music_library(&music_library, filename, loop == 1);
 }
 
 void digi_set_midi_volume(int n)
@@ -870,6 +870,8 @@ bool load_song_list(struct MusicLibrary *lib) {
 
 int digi_init()
 {
+  if (digi_initialized)
+    return 0;
   Snd_Init();
  	digi_initialized = 1;
 

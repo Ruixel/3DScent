@@ -32,8 +32,6 @@
 static int THREAD_AFFINITY = -1;           // Execute thread on any core
 static const int THREAD_STACK_SZ = 32 * 1024;    // 32kB stack for audio thread
 
-const Thread threadId;
-
 // ---- END DEFINITIONS ----
 
 ndspWaveBuf s_waveBufs[3];
@@ -41,10 +39,13 @@ int16_t *s_audioBuffer = NULL;
 
 LightEvent s_event;
 volatile bool s_quit = false;  // Quit flag
+static LightLock s_vfLock;
+static bool s_oggReady = false;
 
 static OggVorbis_File s_vorbisFile;
 static Thread s_threadId;
 static bool s_oggLoaded = false;
+static bool s_oggLoop = false;
 
 typedef struct {
     char *data;
@@ -149,8 +150,11 @@ bool audioInit(OggVorbis_File *vorbisFile_) {
 // Audio de-initialisation code
 // Stops playback and frees the primary audio buffer
 void audioExit(void) {
-    ndspChnReset(START_CHANNEL);
+  ndspChnReset(START_CHANNEL);
+  if (s_audioBuffer) {
     linearFree(s_audioBuffer);
+    s_audioBuffer = NULL;
+  }
 }
 
 // Main audio decoding logic
@@ -166,20 +170,29 @@ bool fillBuffer(OggVorbis_File *vorbisFile_, ndspWaveBuf *waveBuf_) {
         const size_t bufferSize = target_bytes - totalBytes;
 
         const int bytesRead = ov_read(vorbisFile_, (char *)buffer, bufferSize, NULL);
-        if (bytesRead <= 0) {
-            if (bytesRead == 0) break;
-            printf("ov_read: error %d (%s)", bytesRead, vorbisStrError(bytesRead));
+        if (bytesRead < 0) {
+            printf("ov_read: error %d (%s)\n", bytesRead, vorbisStrError(bytesRead));
             break;
+        }
+        if (bytesRead == 0) {
+            // EOF
+            if (s_oggLoop) {
+                if (ov_pcm_seek(vorbisFile_, 0) != 0) {
+                    printf("ov_pcm_seek failed, stopping\n");
+                    break;  // treat as end-of-song
+                }
+                continue;  // keep filling
+            } else {
+                break;  // end of song, no loop
+            }
         }
         totalBytes += bytesRead;
     }
 
     if (totalBytes == 0) {
-        printf("Playback complete\n");
-        return false;
+        return false;  // buffer empty, don't queue it
     }
 
-    // nsamples is frames, not int16s
     waveBuf_->nsamples = totalBytes / bytes_per_frame;
     ndspChnWaveBufAdd(START_CHANNEL, waveBuf_);
     DSP_FlushDataCache(waveBuf_->data_pcm16, totalBytes);
@@ -203,25 +216,29 @@ void audioCallback(void *const nul_) {
 
 // Audio thread
 // This handles calling the decoder function to fill NDSP buffers as necessary
-void audioThread(void *const vorbisFile_) {
-    OggVorbis_File *const vorbisFile = (OggVorbis_File *)vorbisFile_;
+void audioThread(void *const arg) {
+    (void)arg;  // we don't use it anymore — access s_vorbisFile globally
 
-    while(!s_quit) {  // Whilst the quit flag is unset,
-                      // search our waveBufs and fill any that aren't currently
-                      // queued for playback (i.e, those that are 'done')
-        for(size_t i = 0; i < ARRAY_SIZE(s_waveBufs); ++i) {
-            if(s_waveBufs[i].status != NDSP_WBUF_DONE) {
-                continue;
-            }
-            
-            if(!fillBuffer(vorbisFile, &s_waveBufs[i])) {   // Playback complete
-                return;
-            }
+    while (!s_quit) {
+        LightLock_Lock(&s_vfLock);
+        
+        if (!s_oggReady) {
+            // No ogg loaded (or one is being swapped in) — just release and wait
+            LightLock_Unlock(&s_vfLock);
+            LightEvent_Wait(&s_event);
+            continue;
         }
 
-        // Wait for a signal that we're needed again before continuing,
-        // so that we can yield to other things that want to run
-        // (Note that the 3DS uses cooperative threading)
+        for (size_t i = 0; i < ARRAY_SIZE(s_waveBufs); ++i) {
+            if (s_waveBufs[i].status != NDSP_WBUF_DONE) continue;
+            if (!fillBuffer(&s_vorbisFile, &s_waveBufs[i])) {
+                printf("Playback complete\n");
+                s_oggReady = false;
+                break;
+            }
+        }
+        
+        LightLock_Unlock(&s_vfLock);
         LightEvent_Wait(&s_event);
     }
 }
@@ -238,6 +255,24 @@ static size_t ogg_mem_read(void *ptr, size_t size, size_t nmemb, void *datasourc
     return n / size;
 }
 
+static int ogg_mem_seek(void *datasource, ogg_int64_t offset, int whence) {
+    OggMemoryStream *s = (OggMemoryStream *)datasource;
+    size_t np;
+    switch (whence) {
+        case SEEK_SET: np = (size_t)offset; break;
+        case SEEK_CUR: np = s->pos + (size_t)offset; break;
+        case SEEK_END: np = s->size + (size_t)offset; break;
+        default: return -1;
+    }
+    if (np > s->size) return -1;
+    s->pos = np;
+    return 0;
+}
+
+static long ogg_mem_tell(void *datasource) {
+    return (long)((OggMemoryStream *)datasource)->pos;
+}
+
 static int ogg_mem_close(void *datasource) {
     OggMemoryStream *s = (OggMemoryStream *)datasource;
     free(s->data);
@@ -245,7 +280,7 @@ static int ogg_mem_close(void *datasource) {
     return 0;
 }
 
-bool load_ogg_from_music_library(struct MusicLibrary *library, char *fileName) {
+bool load_ogg_from_music_library(struct MusicLibrary *library, char *fileName, bool loop) {
     printf("There are %d files in the archive\n", mz_zip_reader_get_num_files(&library->zip));
     int file_index = mz_zip_reader_locate_file(&library->zip, fileName, NULL, 0);
     if (file_index < 0) {
@@ -270,41 +305,49 @@ bool load_ogg_from_music_library(struct MusicLibrary *library, char *fileName) {
 
     printf("Loaded '%s' from archive, size %zu bytes\n", fileName, stream->size);
 
-    // Only read and close — no seek/tell needed for forward playback
-    ov_callbacks cb = {
-        .read_func  = ogg_mem_read,
-        .seek_func  = NULL,
-        .close_func = ogg_mem_close,
-        .tell_func  = NULL,
-    };
-
+    LightLock_Lock(&s_vfLock);
+    
+    if (s_oggReady) {
+        s_oggReady = false;
+        ov_clear(&s_vorbisFile);
+        audioExit();
+    }
+    
+    ov_callbacks cb = { .read_func = ogg_mem_read, .close_func = ogg_mem_close,
+                         .seek_func = ogg_mem_seek, .tell_func = ogg_mem_tell };
     int error = ov_open_callbacks(stream, &s_vorbisFile, NULL, 0, cb);
     if (error) {
+        LightLock_Unlock(&s_vfLock);
         printf("ov_open_callbacks: %d (%s)\n", error, vorbisStrError(error));
         free(stream->data);
         free(stream);
         return false;
     }
-
+    
     if (!audioInit(&s_vorbisFile)) {
         ov_clear(&s_vorbisFile);
+        LightLock_Unlock(&s_vfLock);
         return false;
     }
-
+    
+    s_oggReady = true;
+    s_oggLoop = loop;
+    LightLock_Unlock(&s_vfLock);
+    
     if (s_threadId == 0) {
+        int32_t priority = 0x30;
+        svcGetThreadPriority(&priority, CUR_THREAD_HANDLE);
+        priority -= 1;
+        if (priority < 0x18) priority = 0x18;
+        if (priority > 0x3F) priority = 0x3F;
 
-    int32_t priority = 0x30;
-    svcGetThreadPriority(&priority, CUR_THREAD_HANDLE);
-    priority -= 1;
-    if (priority < 0x18) priority = 0x18;
-    if (priority > 0x3F) priority = 0x3F;
-
-    s_threadId = threadCreate(audioThread, &s_vorbisFile,
-                              THREAD_STACK_SZ, priority,
-                              THREAD_AFFINITY, false);
+        s_threadId = threadCreate(audioThread, NULL,
+                                  THREAD_STACK_SZ, priority,
+                                  THREAD_AFFINITY, false);
     }
-
-    s_oggLoaded = true;
+    
+    LightEvent_Signal(&s_event);
+    
     return true;
 }
 
@@ -321,21 +364,10 @@ void initOggPlayer(void) {
 
     // Setup LightEvent for synchronisation of audioThread
     LightEvent_Init(&s_event, RESET_ONESHOT);
+    LightLock_Init(&s_vfLock);
 
     // Set the ndsp sound frame callback which signals our audioThread
     ndspSetCallback(audioCallback, NULL);
-
-    // Spawn audio thread
-    //APT_SetAppCpuTimeLimit(30); // Bad idea i think
-
-    // Set the thread priority to the main thread's priority ...
-    int32_t priority = 0x30;
-    svcGetThreadPriority(&priority, CUR_THREAD_HANDLE);
-    // ... then subtract 1, as lower number => higher actual priority ...
-    priority -= 1;
-    // ... finally, clamp it between 0x18 and 0x3F to guarantee that it's valid.
-    priority = priority < 0x18 ? 0x18 : priority;
-    priority = priority > 0x3F ? 0x3F : priority;
 }
 
 void shutdownOggPlayer(void) {
@@ -344,11 +376,21 @@ void shutdownOggPlayer(void) {
     LightEvent_Signal(&s_event);
 
     // Free the audio thread
-    threadJoin(threadId, UINT64_MAX);
-    threadFree(threadId);
+    if (s_threadId) {
+      threadJoin(s_threadId, UINT64_MAX);
+      threadFree(s_threadId);
+      s_threadId = 0;
+    }
+
+    LightLock_Lock(&s_vfLock);
+    if (s_oggReady) {
+      s_oggReady = false;
+      ov_clear(&s_vorbisFile);
+    }
 
     // Cleanup audio things and de-init platform features
     audioExit();
-    if (s_oggLoaded)
-    ov_clear(&s_vorbisFile);
+
+    LightLock_Unlock(&s_vfLock);
+    LightLock_Destroy(&s_vfLock);
 }
