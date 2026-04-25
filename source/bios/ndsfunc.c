@@ -174,6 +174,8 @@ static gpu_tex_entry_t gpu_tex_pool[GPU_TEX_MAX];
 static int gpu_tex_loaded_count;
 static int gpu_tex_total_bytes;
 
+static int poly_count = 0;
+
 // -----------------------------------------------------------------------------
 // Texmerge composite tracking
 //
@@ -555,6 +557,10 @@ static void gpu_tex_preload_all(void)
     printf("gpu_tex: loaded %d/%d bitmaps, %d KB GPU memory\n",
            gpu_tex_loaded_count, Num_bitmap_files,
            gpu_tex_total_bytes / 1024);
+
+    printf("Loaded: %d/%d\n", gpu_tex_loaded_count, Num_bitmap_files);
+    printf("VRAM free: %u KB\n", vramSpaceFree() / 1024);
+    printf("Linear free: %u KB\n", linearSpaceFree() / 1024);
 }
 
 // init_nds_textures is called by piggy_bitmap_page_out_all() after every
@@ -994,6 +1000,8 @@ ITCM_CODE void g3_draw_poly_flat_color(int nv, vms_vector** pointlist, int color
     if (!white_tex_ready) white_tex_init();
     if (!white_tex_ready) return;
 
+    poly_count++;
+
     // Convert palette index to RGB (6-bit → normalized float)
     float r = (float)gr_palette[color_idx * 3 + 0] * (1.0f / 63.0f);
     float g = (float)gr_palette[color_idx * 3 + 1] * (1.0f / 63.0f);
@@ -1142,6 +1150,8 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
 {
     if (nv < 3 || !bm) return;
     if (nv > WORLD_MAX_POLY_VERTS) nv = WORLD_MAX_POLY_VERTS;
+
+    poly_count++;
 
     // Look up the GPU texture for this bitmap. Stages:
     //
@@ -1797,6 +1807,9 @@ static void update_packed_palette(void) {
 
 void bitblt_to_screen(void)
 {
+  if (!aptMainLoop()) {
+    printf("TODO: Shutdown handling\n");
+  }
     u64 t0, t1, t2, t3, t4, t5;
     t0 = svcGetSystemTick();
     hidScanInput();
@@ -1908,6 +1921,9 @@ C3D_TexFlush(&back_tex);
 
     C3D_FrameEnd(0);
     t5 = svcGetSystemTick();
+
+    //printf("Rendered %d polygons\n", poly_count);
+    poly_count = 0;
 
     // Reset world buffer for next frame
     world_frame_begin();
