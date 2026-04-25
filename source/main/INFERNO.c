@@ -1138,10 +1138,12 @@ int main(int argc,char **argv)
 	setbuf(stdout, NULL);	// unbuffered output via printf
 
 	//nds_init ();
+  aptInit();
 
 	// 3DS Initializing code
     //gfxInit(GSP_BGR8_OES, GSP_BGR8_OES, true);  // BGR8: 3 bytes/pixel, matches our blit code
     gfxInitDefault();
+    osSetSpeedupEnable(true);
     consoleInit(GFX_BOTTOM, NULL);
     //gfxSetDoubleBuffering(GFX_BOTTOM, false);
     romfsInit();
@@ -1690,7 +1692,7 @@ int main(int argc,char **argv)
 	printf( (0, "\nInitializing 3d system..." ));
 	g3_init();
 	printf( (0, "\nInitializing texture caching system..." ));
-	texmerge_init( 10 );		// 10 cache bitmaps
+	texmerge_init( 1024 );		// 10 cache bitmaps
 	printf( (0, "\nRunning game...\n" ));
 	set_screen_mode(SCREEN_MENU);
 
