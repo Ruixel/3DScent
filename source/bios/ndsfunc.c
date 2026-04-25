@@ -175,6 +175,12 @@ static int gpu_tex_loaded_count;
 static int gpu_tex_total_bytes;
 
 static int poly_count = 0;
+static int frame_preloaded_hits = 0;     // bm->key was a valid preloaded slot
+static int frame_hash_hits = 0;          // resolved via bm_hash_lookup
+static int frame_dynamic_uploads = 0;    // brand-new bitmap uploaded
+static int frame_composite_uploads = 0;  // texmerge composite uploaded/re-uploaded
+static int frame_composite_reuses = 0;   // composite tracked, key matched, no upload
+static int frame_lookup_failures = 0;    // lookup ended in log_missing_bitmap
 
 // -----------------------------------------------------------------------------
 // Texmerge composite tracking
@@ -1176,6 +1182,7 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
             }
             tt->slot = gpu_tex_upload_dynamic(bm);
             if (tt->slot < 0) {
+                frame_lookup_failures++;
                 log_missing_bitmap(bm, "texmerge-upload-failed");
                 return;
             }
@@ -1183,6 +1190,9 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
             // gpu_tex_upload_to_slot patched bm->key to the slot index.
             // Restore the composite key so we can detect the next change.
             bm->key = tt->composite_key;
+            frame_composite_uploads++;
+        } else {
+            frame_composite_reuses++;
         }
         idx = tt->slot;
     } else {
@@ -1192,12 +1202,17 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
             if (idx < 0 || !gpu_tex_pool[idx].tex) {
                 idx = gpu_tex_upload_dynamic(bm);
                 if (idx < 0) {
+                    frame_lookup_failures++;
                     log_missing_bitmap(bm, "upload-failed");
                     return;
                 }
+                frame_dynamic_uploads++;
             } else {
                 bm->key = idx;  // cache for next time
+                frame_hash_hits++;
             }
+        } else {
+            frame_preloaded_hits++;
         }
     }
     gpu_tex_entry_t* gt = &gpu_tex_pool[idx];
@@ -1923,7 +1938,25 @@ C3D_TexFlush(&back_tex);
     t5 = svcGetSystemTick();
 
     //printf("Rendered %d polygons\n", poly_count);
+    // Print counters every 30 frames to reduce spam
+    static int print_throttle = 0;
+    if (++print_throttle >= 30) {
+        print_throttle = 0;
+        printf("polys=%d preload=%d hash=%d dynUp=%d compUp=%d compReuse=%d fail=%d\n",
+               poly_count,
+               frame_preloaded_hits, frame_hash_hits,
+               frame_dynamic_uploads,
+               frame_composite_uploads, frame_composite_reuses,
+               frame_lookup_failures);
+    }
+
     poly_count = 0;
+    frame_preloaded_hits = 0;
+    frame_hash_hits = 0;
+    frame_dynamic_uploads = 0;
+    frame_composite_uploads = 0;
+    frame_composite_reuses = 0;
+    frame_lookup_failures = 0;
 
     // Reset world buffer for next frame
     world_frame_begin();
