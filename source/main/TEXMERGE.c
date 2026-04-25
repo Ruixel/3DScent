@@ -159,14 +159,11 @@ void merge_textures_super_xparent( int type, grs_bitmap * bottom_bmp, grs_bitmap
 
 //----------------------------------------------------------------------
 
-int texmerge_init(int num_cached_textures)
+int texmerge_init()
 {
 	int i;
 
-	if ( num_cached_textures <= MAX_NUM_CACHE_BITMAPS )
-		num_cache_entries = num_cached_textures;
-	else
-		num_cache_entries = MAX_NUM_CACHE_BITMAPS;
+  num_cache_entries = MAX_NUM_CACHE_BITMAPS;
 	
 	for (i=0; i<num_cache_entries; i++ )	{
 			// Make temp tmap for use when combining
