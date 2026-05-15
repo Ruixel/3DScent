@@ -2101,6 +2101,22 @@ int newdemo_read_demo_start(int rnd_demo)
 #endif
 
 #endif
+    // Single-player game thing
+    if (!(Newdemo_game_mode & GM_MULTI))
+        nd_read_int(&(Players[Player_num].score));
+
+    for (i = 0; i < MAX_PRIMARY_WEAPONS; i++)
+        nd_read_short((short*)&(Players[Player_num].primary_ammo[i]));
+    for (i = 0; i < MAX_SECONDARY_WEAPONS; i++)
+        nd_read_short((short*)&(Players[Player_num].secondary_ammo[i]));
+
+    nd_read_byte(&laser_level);
+    if (laser_level != Players[Player_num].laser_level) {
+        Players[Player_num].laser_level = laser_level;
+        update_laser_weapon_info();
+    }
+
+    nd_read_string(current_mission);
 
 	nd_recorded_total = 0;
 	nd_playback_total = 0;
