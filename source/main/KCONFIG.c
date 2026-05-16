@@ -714,26 +714,33 @@ bool is_pad_input(int keycode) {
   return false;
 }
 
-const int deadzone_threshold = 20 * 20;
-bool is_in_deadzone(circlePosition *pos) {
-  return (pos->dx * pos->dx + pos->dy * pos->dy) < (deadzone_threshold);
-}
-
-const int sensitivity_multiplier = 6;
 fix get_pad_axis_value(int keycode, circlePosition *pos, circlePosition *cpos) {
+    const int deadzone = 20;
+    const int max = 154;
+    const int range = max - deadzone;
+    const int max_sensitivity = 9;
+
+    int raw;
     switch(keycode) {
-        // Circle pad
-        case 77: return pos->dy > 0 && !is_in_deadzone(pos) ? pos->dy * sensitivity_multiplier : 0;    // up
-        case 71: return pos->dy < 0 && !is_in_deadzone(pos) ? (-pos->dy) * sensitivity_multiplier : 0; // down
-        case 73: return pos->dx > 0 && !is_in_deadzone(pos) ? pos->dx * sensitivity_multiplier : 0;    // right
-        case 72: return pos->dx < 0 && !is_in_deadzone(pos) ? (-pos->dx) * sensitivity_multiplier : 0; // left
-        // C-stick
-        case 82: return cpos->dy > 0 && !is_in_deadzone(cpos) ? cpos->dy * sensitivity_multiplier : 0;
-        case 79: return cpos->dy < 0 && !is_in_deadzone(cpos) ? (-cpos->dy) * sensitivity_multiplier : 0;
-        case 80: return cpos->dx > 0 && !is_in_deadzone(cpos) ? cpos->dx * sensitivity_multiplier : 0;
-        case 81: return cpos->dx < 0 && !is_in_deadzone(cpos) ? (-cpos->dx) * sensitivity_multiplier : 0;
+        case 77: raw =  pos->dy; break;
+        case 71: raw = -pos->dy; break;
+        case 73: raw =  pos->dx; break;
+        case 72: raw = -pos->dx; break;
+        case 82: raw =  cpos->dy; break;
+        case 79: raw = -cpos->dy; break;
+        case 80: raw =  cpos->dx; break;
+        case 81: raw = -cpos->dx; break;
         default: return 0;
     }
+
+    if (raw <= deadzone) return 0;
+
+    int remapped = raw - deadzone;
+
+    // blend: 50% linear + 50% squared
+    int curved = (remapped + (remapped * remapped) / range) / 2;
+
+    return curved * 9;
 }
 
 void kc_drawitem( kc_item *item, int is_current )
