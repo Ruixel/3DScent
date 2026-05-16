@@ -855,9 +855,21 @@ bool load_song_list(struct MusicLibrary *lib) {
         // No more songs
         break;
       }
+
       lib->song_names[index++] = strndup(ptr, size - (ptr - data));
       break;
     } else {
+      // Trim any trailing \r characters
+      while (newline > ptr && (newline[-1] == '\r' || newline[-1] == '\n')) {
+        newline--;
+      }
+
+      // A random dxa I downloaded for some reason had empty lines in between songs, so skip those
+      if (newline == ptr) {
+        ptr = newline + 1;
+        continue;
+      }
+      
       lib->song_names[index++] = strndup(ptr, newline - ptr);
       printf("Loaded song %d: %s\n", index, lib->song_names[index]);
       ptr = newline + 1;
@@ -891,7 +903,7 @@ int digi_init()
 
       printf("Songs:\n");
       for (int i = 0; i < NUM_SONGS && music_library.song_names[i]; i++) {
-        printf("  %d: %s\n", i, music_library.song_names[i]);
+        printf("  %d: '%s'\n", i, music_library.song_names[i]);
       }
 
       initOggPlayer();
