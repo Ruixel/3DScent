@@ -703,6 +703,39 @@ int find_next_item_left( kc_item * items, int nitems, int citem )
 }
 #endif
 
+// 71, 72, 73, 77, 79, 80, 81, 82
+const int pad_keycodes[] = {71, 72, 73, 77, 79, 80, 81, 82};
+bool is_pad_input(int keycode) {
+  for (int i = 0; i < sizeof(pad_keycodes)/sizeof(int); i++) {
+    if (pad_keycodes[i] == keycode) {
+       return true;
+    }
+  }
+  return false;
+}
+
+const int deadzone_threshold = 20 * 20;
+bool is_in_deadzone(circlePosition *pos) {
+  return (pos->dx * pos->dx + pos->dy * pos->dy) < (deadzone_threshold);
+}
+
+const int sensitivity_multiplier = 6;
+fix get_pad_axis_value(int keycode, circlePosition *pos, circlePosition *cpos) {
+    switch(keycode) {
+        // Circle pad
+        case 77: return pos->dy > 0 && !is_in_deadzone(pos) ? pos->dy * sensitivity_multiplier : 0;    // up
+        case 71: return pos->dy < 0 && !is_in_deadzone(pos) ? (-pos->dy) * sensitivity_multiplier : 0; // down
+        case 73: return pos->dx > 0 && !is_in_deadzone(pos) ? pos->dx * sensitivity_multiplier : 0;    // right
+        case 72: return pos->dx < 0 && !is_in_deadzone(pos) ? (-pos->dx) * sensitivity_multiplier : 0; // left
+        // C-stick
+        case 82: return cpos->dy > 0 && !is_in_deadzone(cpos) ? cpos->dy * sensitivity_multiplier : 0;
+        case 79: return cpos->dy < 0 && !is_in_deadzone(cpos) ? (-cpos->dy) * sensitivity_multiplier : 0;
+        case 80: return cpos->dx > 0 && !is_in_deadzone(cpos) ? cpos->dx * sensitivity_multiplier : 0;
+        case 81: return cpos->dx < 0 && !is_in_deadzone(cpos) ? (-cpos->dx) * sensitivity_multiplier : 0;
+        default: return 0;
+    }
+}
+
 void kc_drawitem( kc_item *item, int is_current )
 {
 	int x, w, h, aw;
@@ -788,6 +821,7 @@ void kc_drawitem( kc_item *item, int is_current )
 
 
   printf( "kc_drawitem: %d, item value = %d\n", *btext, item->value );
+  printf( "is pad: %d\n", is_pad_input(item->value));
 		gr_string( x, item->y, btext );
 //	else if ( (item->type == BT_JOY_AXIS) || (item->type == BT_MOUSE_AXIS) || (item->type == BT_INVERT) )
 //		gr_string(x, item->y - 164, btext);
@@ -1872,6 +1906,13 @@ void controls_read_all()
   //joy_axis[0] = 0.5f;
   //Controls.pitch_time += 300;
 
+	circlePosition pos, cstick_pos;
+	hidCircleRead(&pos);
+  hidCstickRead(&cstick_pos);
+
+	//printf("\x1b[3;1H%04d; %04d", pos.dx, pos.dy);
+	printf("%04d; %04d\n", pos.dx, pos.dy);
+  
 
 //	if (Config_control_type==5 ) {
 
@@ -1930,10 +1971,33 @@ void controls_read_all()
 		kp = 0;
 
 		// From keyboard...
-		if ( kc_keyboard[0].value < 255 ) kp += (speed_factor*key_down_time( kc_keyboard[0].value )/2)/PH_SCALE;
+		//if ( kc_keyboard[0].value < 255 ) kp += (speed_factor*key_down_time( kc_keyboard[0].value )/2)/PH_SCALE;
 //		if ( kc_keyboard[1].value < 255 ) kp += (speed_factor*key_down_time( kc_keyboard[1].value )/2)/PH_SCALE;
-		if ( kc_keyboard[2].value < 255 ) kp -= (speed_factor*key_down_time( kc_keyboard[2].value )/2)/PH_SCALE;
+		//if ( kc_keyboard[2].value < 255 ) kp -= (speed_factor*key_down_time( kc_keyboard[2].value )/2)/PH_SCALE;
 //		if ( kc_keyboard[3].value < 255 ) kp -= (speed_factor*key_down_time( kc_keyboard[3].value )/2)/PH_SCALE;
+  if ( kc_keyboard[0].value < 255 ) {
+    if (is_pad_input(kc_keyboard[0].value)) {
+      kp += get_pad_axis_value(kc_keyboard[0].value, &pos, &cstick_pos) / PH_SCALE;
+    } else {
+      kp += (speed_factor * key_down_time(kc_keyboard[0].value) / 2) / PH_SCALE;
+
+    }
+  }
+  if ( kc_keyboard[2].value < 255 ) {
+    if (is_pad_input(kc_keyboard[2].value)) {
+      kp -= get_pad_axis_value(kc_keyboard[2].value, &pos, &cstick_pos) / PH_SCALE;
+    } else {
+      kp -= (speed_factor * key_down_time(kc_keyboard[2].value) / 2) / PH_SCALE;
+    }
+  }
+
+// printf("kc0 value=%d, dy=%d\n", kc_keyboard[0].value, pos.dy);
+//     printf("kc0=%d kc2=%d dy=%d pad0=%d pad2=%d\n", 
+//     kc_keyboard[0].value, 
+//     kc_keyboard[2].value,
+//     pos.dy,
+//     get_pad_axis_value(kc_keyboard[0].value, &pos, &cstick_pos),
+//     get_pad_axis_value(kc_keyboard[2].value, &pos, &cstick_pos));
 
 		// From Cyberman...
 /*		if ((use_mouse)&&(Config_control_type==CONTROL_CYBERMAN))	{
@@ -2034,10 +2098,20 @@ void controls_read_all()
 		kh = 0;
 
 		// From keyboard...
-		if ( kc_keyboard[4].value < 255 ) kh -= (speed_factor*key_down_time( kc_keyboard[4].value ))/PH_SCALE;
-//		if ( kc_keyboard[5].value < 255 ) kh -= (speed_factor*key_down_time( kc_keyboard[5].value ))/PH_SCALE;
-		if ( kc_keyboard[6].value < 255 ) kh += (speed_factor*key_down_time( kc_keyboard[6].value ))/PH_SCALE;
-//		if ( kc_keyboard[7].value < 255 ) kh += (speed_factor*key_down_time( kc_keyboard[7].value ))/PH_SCALE;
+    if ( kc_keyboard[4].value < 255 ) {
+      if (is_pad_input(kc_keyboard[4].value)) {
+        kh -= get_pad_axis_value(kc_keyboard[4].value, &pos, &cstick_pos) / PH_SCALE;
+      } else {
+            kh -= (speed_factor * key_down_time(kc_keyboard[4].value)) / PH_SCALE;
+      }
+    }
+    if ( kc_keyboard[6].value < 255 ) {
+      if (is_pad_input(kc_keyboard[6].value)) {
+        kh += get_pad_axis_value(kc_keyboard[6].value, &pos, &cstick_pos) / PH_SCALE;
+      } else {
+        kh += (speed_factor * key_down_time(kc_keyboard[6].value)) / PH_SCALE;
+      }
+    }
 
 		// From Cyberman...
 /*		if ((use_mouse)&&(Config_control_type==CONTROL_CYBERMAN))	{
