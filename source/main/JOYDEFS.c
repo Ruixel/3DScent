@@ -540,22 +540,25 @@ void joydefs_calibrate()
 void joydef_menuset_1(int nitems, newmenu_item * items, int *last_key, int citem )
 {
 //	int i;
-	int oc_type = Config_control_type;
+// 	int oc_type = Config_control_type;
+// 
+// 	nitems = nitems;
+// 	last_key = last_key;
+// 	citem = citem;		
 
-	nitems = nitems;
-	last_key = last_key;
-	citem = citem;		
+  Config_cpad_sensitivity = items[0].value;
+  Config_cpad_deadzone = items[1].value;
 
 //	for (i=0; i<CONTROL_MAX_TYPES; i++ )
 //		if (items[i].value) Config_control_type = i;
-	if (items[0].value)
-		Config_control_type = CONTROL_NONE;
-	else if (items[1].value)
-		Config_control_type = CONTROL_MOUSE;
-	else {
-		Int3();
-		Config_control_type = CONTROL_NONE;
-	}
+//	if (items[0].value)
+//		Config_control_type = CONTROL_NONE;
+//	else if (items[1].value)
+//		Config_control_type = CONTROL_MOUSE;
+//	else {
+//		Int3();
+//		Config_control_type = CONTROL_NONE;
+//	}
 /*
 	if (items[0].value)
 		Config_control_type = CONTROL_NONE;
@@ -576,15 +579,15 @@ void joydef_menuset_1(int nitems, newmenu_item * items, int *last_key, int citem
 //		nm_messagebox( TXT_IMPORTANT_NOTE, 1, TXT_OK, TXT_FCS );
 //	}
 
-	if (oc_type != Config_control_type) {
-		switch (Config_control_type) {
-			case	CONTROL_JOYSTICK:
-			case	CONTROL_FLIGHTSTICK_PRO:
-				joydefs_calibrate_flag = 1;
-		}
-		kc_set_controls();
-		joydefs_set_type(Config_control_type);
-	}
+	// if (oc_type != Config_control_type) {
+	// 	switch (Config_control_type) {
+	// 		case	CONTROL_JOYSTICK:
+	// 		case	CONTROL_FLIGHTSTICK_PRO:
+	// 			joydefs_calibrate_flag = 1;
+	// 	}
+	// 	kc_set_controls();
+	// 	joydefs_set_type(Config_control_type);
+	// }
 }
 
 void joydefs_config()
@@ -594,16 +597,12 @@ void joydefs_config()
 	int i1=7;
 
 	do {
-		m[0].type = NM_TYPE_RADIO; m[0].text = "DS Pad only"; m[0].value = 0; m[0].group = 0;
-		m[1].type = NM_TYPE_RADIO; m[1].text = "Touchscreen"; m[1].value = 0; m[1].group = 0;
-		m[2].type = NM_TYPE_MENU; m[2].text=TXT_CUST_ABOVE;
-		m[3].type = NM_TYPE_TEXT; m[3].text="";
-		m[4].type = NM_TYPE_MENU; m[4].text="Customize DS Pad";
+		m[0].type = NM_TYPE_SLIDER; m[0].text="Pad Sensitivity"; m[0].value=Config_cpad_sensitivity ;m[0].min_value=0; m[0].max_value=10; 
+		//m[1].type = NM_TYPE_RADIO; m[1].text = "Touchscreen"; m[1].value = 0; m[1].group = 0;
+    m[1].type = NM_TYPE_SLIDER; m[1].text="Pad Deadzone"; m[1].value=Config_cpad_deadzone ;m[1].min_value=0; m[1].max_value=10;
+		m[2].type = NM_TYPE_TEXT; m[2].text="";
+		m[3].type = NM_TYPE_MENU; m[3].text="Customise controls";
 
-		if (Config_control_type == CONTROL_MOUSE)
-			m[1].value = 1;
-		else
-			m[0].value = 1;
 /*
 		m[0].type = NM_TYPE_RADIO; m[0].text = CONTROL_TEXT(0); m[0].value = 0; m[0].group = 0;
 		m[1].type = NM_TYPE_RADIO; m[1].text = CONTROL_TEXT(1); m[1].value = 0; m[1].group = 0;
@@ -629,11 +628,11 @@ void joydefs_config()
 		else
 			m[0].value = 1;
 */	 
-		i1 = newmenu_do4( NULL, TXT_CONTROLS, 5, m, joydef_menuset_1, i1, NULL, -1, -1, 1 );
+		i1 = newmenu_do4( NULL, TXT_CONTROLS, 4, m, joydef_menuset_1, i1, NULL, -1, -1, 1 );
 
 		switch(i1)	{
 
-		case 2: {
+		case 6: {
 			/*
 				old_masks = 0;
 				for (i=0; i<4; i++ )		{
@@ -674,7 +673,7 @@ void joydefs_config()
 				*/
 			}
 			break;
-		case 4:
+		case 3:
 			kconfig(0, "DS Pad"); 
 			break;
 		} 

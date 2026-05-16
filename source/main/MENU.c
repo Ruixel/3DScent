@@ -856,13 +856,11 @@ void do_options_menu()
 		m[5].type = NM_TYPE_MENU; m[5].text=TXT_DETAIL_LEVELS;
 //		m[6].type = NM_TYPE_TEXT; m[6].text=TXT_CAL_JOYSTICK;
 		m[6].type = NM_TYPE_TEXT; m[6].text="";
-		m[7].type = NM_TYPE_SLIDER; m[7].text="Touchscreen\nSensitivity"; m[7].value=Config_joystick_sensitivity; m[7].min_value =0; m[7].max_value = 8;
-		m[8].type = NM_TYPE_TEXT; m[8].text="";
-		m[9].type = NM_TYPE_CHECK; m[9].text="Ship auto-leveling"; m[9].value=Auto_leveling_on;
-		m[10].type = NM_TYPE_CHECK; m[10].text="Auto-select pri. weapon"; m[10].value=Auto_primary_weapon_selection;
-		m[11].type = NM_TYPE_CHECK; m[11].text="Auto-select sec. weapon"; m[11].value=Auto_secondary_weapon_selection;
+		m[7].type = NM_TYPE_CHECK; m[7].text="Ship auto-leveling"; m[9].value=Auto_leveling_on;
+		m[8].type = NM_TYPE_CHECK; m[8].text="Auto-select pri. weapon"; m[10].value=Auto_primary_weapon_selection;
+		m[9].type = NM_TYPE_CHECK; m[9].text="Auto-select sec. weapon"; m[11].value=Auto_secondary_weapon_selection;
 
-		i = newmenu_do4( NULL, TXT_OPTIONS, 12, m, joydef_menuset, i, NULL, -1, -1, 1 );
+		i = newmenu_do4( NULL, TXT_OPTIONS, 10, m, joydef_menuset, i, NULL, -1, -1, 1 );
 			
 		switch(i)	{
 			case 0: do_sound_menu();			break;
@@ -872,7 +870,7 @@ void do_options_menu()
 		}
 
 //		Config_channels_reversed = m[2].value;
-		Config_joystick_sensitivity = m[7].value;
+		//Config_joystick_sensitivity = m[7].value;
 		Auto_leveling_on = m[9].value;
 		Auto_primary_weapon_selection=m[10].value;
 		Auto_secondary_weapon_selection=m[11].value;

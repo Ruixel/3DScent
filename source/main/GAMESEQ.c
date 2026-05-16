@@ -895,6 +895,8 @@ int RegisterPlayer()
 		// Set default config options in case there is no config file
 		// kc_keyboard, kc_joystick, kc_mouse are statically defined.
 		Config_joystick_sensitivity = 8;
+    Config_cpad_sensitivity = 9;
+    Config_cpad_deadzone = 16;
 		Config_control_type =CONTROL_NONE;
 		for (i=0; i<CONTROL_MAX_TYPES; i++ )
 			for (j=0; j<MAX_CONTROLS; j++ )
@@ -904,6 +906,7 @@ int RegisterPlayer()
 
 		// Read the last player's name from config file, not lastplr.txt
 		strncpy( Players[Player_num].callsign, config_last_player, CALLSIGN_LEN );
+    printf( "Last player from config file is '%s'\n", Players[Player_num].callsign);
 
 		if (config_last_player[0]==0)
 			allow_abort_flag = 0;

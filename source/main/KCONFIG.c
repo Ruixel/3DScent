@@ -438,6 +438,8 @@ ubyte Config_midi_volume = 16;
 ubyte Config_control_type = 0;
 ubyte Config_channels_reversed = 0;
 ubyte Config_joystick_sensitivity = 8;
+ubyte Config_cpad_sensitivity = 9;
+ubyte Config_cpad_deadzone = 16;
 
 fix Cruise_speed=0;
 
@@ -715,10 +717,11 @@ bool is_pad_input(int keycode) {
 }
 
 fix get_pad_axis_value(int keycode, circlePosition *pos, circlePosition *cpos) {
-    const int deadzone = 20;
     const int max = 154;
-    const int range = max - deadzone;
-    const int max_sensitivity = 9;
+    const int minimum_sensitivity = 5;
+    int sensitivity = Config_cpad_sensitivity * 0.75 + minimum_sensitivity;
+    int deadzone = Config_cpad_deadzone * 2;
+    int range = max - deadzone;
 
     int raw;
     switch(keycode) {
@@ -740,7 +743,7 @@ fix get_pad_axis_value(int keycode, circlePosition *pos, circlePosition *cpos) {
     // blend: 50% linear + 50% squared
     int curved = (remapped + (remapped * remapped) / range) / 2;
 
-    return curved * 9;
+    return curved * sensitivity;
 }
 
 void kc_drawitem( kc_item *item, int is_current )

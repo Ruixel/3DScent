@@ -383,6 +383,8 @@ int new_player_config()
 	highest_levels[0].shortname[0] = 0;			//no name for mission 0
 	highest_levels[0].level_num = 1;				//was highest level in old struct
 	Config_joystick_sensitivity = 8;
+  Config_cpad_sensitivity = 9;
+  Config_cpad_deadzone = 16;
 
 	Auto_primary_weapon_selection = 1;
 	Auto_secondary_weapon_selection = 1;
@@ -512,6 +514,10 @@ int read_player_file()
 		else if (fread(&Config_control_type, sizeof(ubyte), 1, file )!=1)
 			errno_ret=errno;
 		else if (fread(&Config_joystick_sensitivity, sizeof(ubyte), 1, file )!=1)
+			errno_ret=errno;
+		else if (fread(&Config_cpad_sensitivity, sizeof(ubyte), 1, file )!=1)
+			errno_ret=errno;
+		else if (fread(&Config_cpad_deadzone, sizeof(ubyte), 1, file )!=1)
 			errno_ret=errno;
 
 		if (Config_control_type == CONTROL_CYBERMAN)
@@ -716,6 +722,11 @@ char filename[64];
 			errno_ret=errno;
 		else if (fwrite( &Config_joystick_sensitivity, sizeof(ubyte), 1, file )!=1)
 			errno_ret=errno;
+    else if (fwrite( &Config_cpad_sensitivity, sizeof(ubyte), 1, file )!=1)
+      errno_ret=errno;
+    else if (fwrite( &Config_cpad_deadzone, sizeof(ubyte), 1, file )!=1)
+      errno_ret=errno;
+
 	}
 
 	fwrite (&Auto_primary_weapon_selection, sizeof (byte), 1, file);
