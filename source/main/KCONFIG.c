@@ -2005,15 +2005,25 @@ void controls_read_all()
 			kp -= mouse_button_down_time(MB_PITCH_BACKWARD)/(PH_SCALE*2);
 		}
 */	
-		if (kp == 0)
-			Controls.pitch_time = 0;
-		else if (kp > 0) {
-			if (Controls.pitch_time < 0)
-				Controls.pitch_time = 0;
-		} else // kp < 0
-			if (Controls.pitch_time > 0)
-				Controls.pitch_time = 0;
-		Controls.pitch_time += kp;
+  if (is_pad_input(kc_keyboard[0].value) || is_pad_input(kc_keyboard[2].value)) {
+      // Direct proportional control - map stick position to ±FrameTime/2
+      fix up   = get_pad_axis_value(kc_keyboard[0].value, &pos, &cstick_pos);
+      fix down = get_pad_axis_value(kc_keyboard[2].value, &pos, &cstick_pos);
+      //Controls.pitch_time = fixmul(up - down, FrameTime / 2) / (154 * 6);
+
+      fix result = (up - down) * FrameTime / (154 * 6);
+      Controls.pitch_time = result;
+  } else {
+      if (kp == 0)
+          Controls.pitch_time = 0;
+      else if (kp > 0) {
+          if (Controls.pitch_time < 0)
+              Controls.pitch_time = 0;
+      } else
+          if (Controls.pitch_time > 0)
+              Controls.pitch_time = 0;
+      Controls.pitch_time += kp;
+  }
 	
 		// From joystick...
 /*		if ( (use_joystick)&&(kc_joystick[13].value < 255 ))	{
@@ -2119,15 +2129,24 @@ void controls_read_all()
 			kh += mouse_button_down_time(MB_HEAD_RIGHT)/PH_SCALE;
 		}
 */	
-		if (kh == 0)
-			Controls.heading_time = 0;
-		else if (kh > 0) {
-			if (Controls.heading_time < 0)
-				Controls.heading_time = 0;
-		} else // kh < 0
-			if (Controls.heading_time > 0)
-				Controls.heading_time = 0;
-		Controls.heading_time += kh;
+if (is_pad_input(kc_keyboard[4].value) || is_pad_input(kc_keyboard[6].value)) {
+    fix left  = get_pad_axis_value(kc_keyboard[4].value, &pos, &cstick_pos);
+    fix right = get_pad_axis_value(kc_keyboard[6].value, &pos, &cstick_pos);
+    fix result = (right - left) * FrameTime / (154 * 6);
+//printf("heading: kc4=%d kc6=%d left=%d right=%d FrameTime=%d result=%d\n",
+//        kc_keyboard[4].value, kc_keyboard[6].value, left, right, FrameTime, result);
+    Controls.heading_time = result;
+} else {
+    if (kh == 0)
+        Controls.heading_time = 0;
+    else if (kh > 0) {
+        if (Controls.heading_time < 0)
+            Controls.heading_time = 0;
+    } else
+        if (Controls.heading_time > 0)
+            Controls.heading_time = 0;
+    Controls.heading_time += kh;
+}
 
 		// From joystick...
 /*		if ( (use_joystick)&&(kc_joystick[15].value < 255 ))	{
