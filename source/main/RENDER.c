@@ -1445,43 +1445,25 @@ int t;
 
 //short the children of segment to render in the correct order
 //returns non-zero if swaps were made
-int sort_seg_children(segment *seg,int n_children,short *child_list)
+int sort_seg_children(segment *seg, int n_children, short *child_list)
 {
-	int i,j;
-	int r;
-	int made_swaps,count;
-
-	if (n_children == 0) return 0;
-
-// ssc_total++;
-
-	//for each child,  compare with other children and see if order matters
-	//if order matters, fix if wrong
-
-	count = 0;
-
-	do {
-		made_swaps = 0;
-
-		for (i=0;i<n_children-1;i++)
-			for (j=i+1;child_list[i]!=-1 && j<n_children;j++)
-				if (child_list[j]!=-1) {
-					r = compare_children(seg,child_list[i],child_list[j]);
-
-					if (r == 1) {
-						int temp = child_list[i];
-						child_list[i] = child_list[j];
-						child_list[j] = temp;
-						made_swaps=1;
-					}
-				}
-
-	} while (made_swaps && ++count<n_children);
-
-// if (count)
-  //ssc_swaps++;
-
-	return count;
+    int i, j;
+    
+    if (n_children <= 1) return 0;
+    
+    for (i = 1; i < n_children; i++) {
+        short key = child_list[i];
+        if (key == -1) continue;
+        
+        j = i - 1;
+        while (j >= 0 && child_list[j] != -1 && compare_children(seg, child_list[j], key) == 1) {
+            child_list[j+1] = child_list[j];
+            j--;
+        }
+        child_list[j+1] = key;
+    }
+    
+    return 0;
 }
 
 void add_obj_to_seglist(int objnum,int listnum)
