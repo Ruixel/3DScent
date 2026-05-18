@@ -1921,7 +1921,7 @@ void controls_read_all()
   hidCstickRead(&cstick_pos);
 
 	//printf("\x1b[3;1H%04d; %04d", pos.dx, pos.dy);
-	printf("%04d; %04d\n", pos.dx, pos.dy);
+	//printf("%04d; %04d\n", pos.dx, pos.dy);
   
 
 //	if (Config_control_type==5 ) {
