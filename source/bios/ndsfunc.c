@@ -25,6 +25,7 @@
 #include "3ds.h"
 #include <citro3d.h>
 
+#include "3ds/gpu/enums.h"
 #include "fix.h"
 #include "gr.h"
 #include "key.h"
@@ -626,7 +627,7 @@ bool gpu_inited = false;
 typedef struct { float x, y, z; } world_vertex;
 #else
 // position (3) + texcoord (2) + color RGB (3) = 8 floats = 32 bytes per vertex
-typedef struct { float x, y, z, u, v, r, g, b; } world_vertex;
+typedef struct { float x, y, z, u, v, light; u32 color; } world_vertex;
 #endif
 
 static shaderProgram_s  world_program;
@@ -643,7 +644,7 @@ static int              world_vbo_count;
 // world_frame_end(). Each batch is a contiguous range in world_vbo plus
 // the texture to bind.
 #if WORLD_MODE == WORLD_MODE_TEXTURED
-#define WORLD_MAX_BATCHES  256  // unique textures per frame
+#define WORLD_MAX_BATCHES  2561  // unique textures per frame
 typedef struct {
     C3D_Tex* tex;
     int      vert_start;
@@ -755,14 +756,14 @@ static void world_emit_line(float x0, float y0, float x1, float y1)
 // Textured vertex emission — fan-triangulated polygon with UVs
 // Now takes camera-space 3D position; the GPU vertex shader projects.
 // -----------------------------------------------------------------------------
-static inline void world_emit_vert(float x, float y, float z, float u, float v,
-                                   float r, float g, float b)
+static inline void world_emit_vert(float x, float y, float z, float u, float v, float light, u32 color)
 {
     if (world_vbo_count >= WIRE_MAX_VERTS) return;
     world_vertex* p = &world_vbo[world_vbo_count++];
     p->x = x; p->y = y; p->z = z;
     p->u = u; p->v = v;
-    p->r = r; p->g = g; p->b = b;
+    p->light = light;
+    p->color = color;
 }
 #endif
 
@@ -872,13 +873,15 @@ static void world_setup_state(void)
     AttrInfo_AddLoader(attrInfo, 0, GPU_FLOAT, 3);  // position
 #if WORLD_MODE == WORLD_MODE_TEXTURED
     AttrInfo_AddLoader(attrInfo, 1, GPU_FLOAT, 2);  // texcoord
-    AttrInfo_AddLoader(attrInfo, 2, GPU_FLOAT, 3);  // color (RGB)
+    AttrInfo_AddLoader(attrInfo, 2, GPU_FLOAT, 1);  // light
+    AttrInfo_AddLoader(attrInfo, 3, GPU_UNSIGNED_BYTE, 4);  // color (RGB)
 #endif
 
     C3D_BufInfo* bufInfo = C3D_GetBufInfo();
     BufInfo_Init(bufInfo);
 #if WORLD_MODE == WORLD_MODE_TEXTURED
-    BufInfo_Add(bufInfo, world_vbo, sizeof(world_vertex), 3, 0x210);  // 3 attrs: pos@0, tex@1, color@2
+    //BufInfo_Add(bufInfo, world_vbo, sizeof(world_vertex), 3, 0x210);  // 3 attrs: pos@0, tex@1, color@2
+    BufInfo_Add(bufInfo, world_vbo, sizeof(world_vertex), 4, 0x3210);  // 4 attrs: pos@0, tex@1, light@2, color@3
 #else
     BufInfo_Add(bufInfo, world_vbo, sizeof(world_vertex), 1, 0x0);
 #endif
@@ -913,6 +916,16 @@ static void world_frame_end(void)
     C3D_DrawArrays(GPU_TRIANGLES, 0, world_vbo_count);
 #else
     // One draw call per accumulated batch (one per unique texture run).
+    printf("Drawing %d world batches, %d verts\n", world_batch_count, world_vbo_count);
+int unique_tex = 0;
+C3D_Tex* seen[WORLD_MAX_BATCHES];
+for (int i = 0; i < world_batch_count; i++) {
+    bool found = false;
+    for (int j = 0; j < unique_tex; j++)
+        if (seen[j] == world_batches[i].tex) { found = true; break; }
+    if (!found) seen[unique_tex++] = world_batches[i].tex;
+}
+printf("unique textures: %d\n", unique_tex);
     for (int i = 0; i < world_batch_count; i++) {
         world_batch_t* b = &world_batches[i];
         if (b->vert_count == 0) continue;
@@ -1012,6 +1025,8 @@ ITCM_CODE void g3_draw_poly_flat_color(int nv, vms_vector** pointlist, int color
     float r = (float)gr_palette[color_idx * 3 + 0] * (1.0f / 63.0f);
     float g = (float)gr_palette[color_idx * 3 + 1] * (1.0f / 63.0f);
     float b = (float)gr_palette[color_idx * 3 + 2] * (1.0f / 63.0f);
+    //u32 color = ((u32)(b * 255) << 24) | ((u32)(g * 255) << 16) | ((u32)(r * 255) << 8) | 0xFF;
+    u32 color = 0xFF000000 | ((u32)(b * 255) << 16) | ((u32)(g * 255) << 8) | (u32)(r * 255);
 
     // Near-plane clipping via Sutherland-Hodgman (same approach as tmap_tex)
     if (nv > WORLD_MAX_POLY_VERTS) nv = WORLD_MAX_POLY_VERTS;
@@ -1065,9 +1080,9 @@ ITCM_CODE void g3_draw_poly_flat_color(int nv, vms_vector** pointlist, int color
 
     // Fan triangulate; UV 0.5 samples middle of white texture (always white)
     for (int i = 1; i < out_nv - 1; i++) {
-        world_emit_vert(cx[0],   cy[0],   cz[0],   0.5f, 0.5f, r, g, b);
-        world_emit_vert(cx[i],   cy[i],   cz[i],   0.5f, 0.5f, r, g, b);
-        world_emit_vert(cx[i+1], cy[i+1], cz[i+1], 0.5f, 0.5f, r, g, b);
+      world_emit_vert(cx[0],   cy[0],   cz[0],   0.5f, 0.5f, 1.0f, color);
+      world_emit_vert(cx[i],   cy[i],   cz[i],   0.5f, 0.5f, 1.0f, color);
+      world_emit_vert(cx[i+1], cy[i+1], cz[i+1], 0.5f, 0.5f, 1.0f, color);
     }
     batch->vert_count += needed;
 }
@@ -1151,9 +1166,13 @@ static void light_to_rgb(fix l, float* out_r, float* out_g, float* out_b)
     *out_b = brightness;
 }
 
+u64 tmap_ticks = 0;
+u64 t_lookup = 0, t_convert = 0, t_clip = 0, t_emit = 0;
 ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
                                 g3s_uvl* uvl_list, grs_bitmap* bm)
 {
+    u64 t0 = svcGetSystemTick();
+    u64 t1 = t0;
     if (nv < 3 || !bm) return;
     if (nv > WORLD_MAX_POLY_VERTS) nv = WORLD_MAX_POLY_VERTS;
 
@@ -1221,25 +1240,27 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
         return;
     }
 
+    t_lookup += svcGetSystemTick() - t0;
+
     // Convert camera-space fixed-point to float. The GPU vertex shader will
     // apply our perspective projection matrix, doing the perspective divide
     // and producing perspective-correct UV interpolation as a side effect.
+    t0 = svcGetSystemTick();
     float in_cx[WORLD_MAX_POLY_VERTS], in_cy[WORLD_MAX_POLY_VERTS], in_cz[WORLD_MAX_POLY_VERTS];
     float in_u [WORLD_MAX_POLY_VERTS], in_v [WORLD_MAX_POLY_VERTS];
-    float in_r [WORLD_MAX_POLY_VERTS], in_g [WORLD_MAX_POLY_VERTS], in_b[WORLD_MAX_POLY_VERTS];
+    float in_light[WORLD_MAX_POLY_VERTS];
 
     for (int i = 0; i < nv; i++) {
         in_cx[i] = (float)pointlist[i]->x * (1.0f / 65536.0f);
         in_cy[i] = (float)pointlist[i]->y * (1.0f / 65536.0f);
         in_cz[i] = (float)pointlist[i]->z * (1.0f / 65536.0f);
-        // UVs: Descent stores as 16.16 fix where 1.0 = full texture.
-        // Scale by u_scale/v_scale to handle non-POT padding.
-        // Flip V — Descent's V origin is opposite from PICA200's.
         in_u[i] = (float)uvl_list[i].u * (1.0f / 65536.0f) * gt->u_scale;
         in_v[i] = gt->v_scale - (float)uvl_list[i].v * (1.0f / 65536.0f) * gt->v_scale;
-        // Per-vertex lighting: convert fix-point l value to RGB via fade table
-        light_to_rgb(uvl_list[i].l, &in_r[i], &in_g[i], &in_b[i]);
+        in_light[i] = (float)uvl_list[i].l * (1.0f / 65536.0f);
+        if (in_light[i] < 0.0f) in_light[i] = 0.0f;
+        if (in_light[i] > 1.0f) in_light[i] = 1.0f;
     }
+    t_convert += svcGetSystemTick() - t0;
 
     // -------------------------------------------------------------------------
     // Near-plane clipping (Sutherland-Hodgman).
@@ -1251,41 +1272,56 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
     // Output may have up to nv+1 vertices (each behind-to-front transition
     // adds one). We size the output buffer accordingly.
     // -------------------------------------------------------------------------
+    t0 = svcGetSystemTick();
+    /*
     #define CLIP_MAX_OUT (WORLD_MAX_POLY_VERTS + 2)
-    float cx[CLIP_MAX_OUT], cy[CLIP_MAX_OUT], cz[CLIP_MAX_OUT];
-    float u [CLIP_MAX_OUT], v [CLIP_MAX_OUT];
-    float r [CLIP_MAX_OUT], g [CLIP_MAX_OUT], b [CLIP_MAX_OUT];
-    int out_nv = 0;
+    float *use_cx, *use_cy, *use_cz;
+    float *use_u,  *use_v;
+    float *use_light;
+    int out_nv;
 
+    bool needs_clip = false;
     for (int i = 0; i < nv; i++) {
-        int j = (i + 1) % nv;
-        bool curr_in = in_cz[i] >= WIRE_NEAR;
-        bool next_in = in_cz[j] >= WIRE_NEAR;
+        if (in_cz[i] < WIRE_NEAR) { needs_clip = true; break; }
+    }
 
-        if (curr_in) {
-            // Always keep current vertex if it's in front
-            cx[out_nv] = in_cx[i]; cy[out_nv] = in_cy[i]; cz[out_nv] = in_cz[i];
-            u[out_nv]  = in_u[i];  v[out_nv]  = in_v[i];
-            r[out_nv]  = in_r[i];  g[out_nv]  = in_g[i];  b[out_nv] = in_b[i];
-            out_nv++;
+    if (!needs_clip) {
+        use_cx    = in_cx;    use_cy    = in_cy;    use_cz    = in_cz;
+        use_u     = in_u;     use_v     = in_v;
+        use_light = in_light;
+        out_nv = nv;
+    } else {
+        static float cx[CLIP_MAX_OUT], cy[CLIP_MAX_OUT], cz[CLIP_MAX_OUT];
+        static float cu[CLIP_MAX_OUT], cv[CLIP_MAX_OUT];
+        static float cl[CLIP_MAX_OUT];
+        out_nv = 0;
+
+        for (int i = 0; i < nv; i++) {
+            int j = (i + 1) % nv;
+            bool curr_in = in_cz[i] >= WIRE_NEAR;
+            bool next_in = in_cz[j] >= WIRE_NEAR;
+
+            if (curr_in) {
+                cx[out_nv] = in_cx[i]; cy[out_nv] = in_cy[i]; cz[out_nv] = in_cz[i];
+                cu[out_nv] = in_u[i];  cv[out_nv] = in_v[i];
+                cl[out_nv] = in_light[i];
+                out_nv++;
+            }
+            if (curr_in != next_in) {
+                float t = (WIRE_NEAR - in_cz[i]) / (in_cz[j] - in_cz[i]);
+                cx[out_nv] = in_cx[i] + t * (in_cx[j] - in_cx[i]);
+                cy[out_nv] = in_cy[i] + t * (in_cy[j] - in_cy[i]);
+                cz[out_nv] = WIRE_NEAR;
+                cu[out_nv] = in_u[i]  + t * (in_u[j]  - in_u[i]);
+                cv[out_nv] = in_v[i]  + t * (in_v[j]  - in_v[i]);
+                cl[out_nv] = in_light[i] + t * (in_light[j] - in_light[i]);
+                out_nv++;
+            }
         }
-        if (curr_in != next_in) {
-            // Edge crosses the near plane — compute intersection
-            // Parametric form: P(t) = curr + t * (next - curr), 0 <= t <= 1
-            // Solve for t where P.z = WIRE_NEAR:
-            //   curr.z + t * (next.z - curr.z) = WIRE_NEAR
-            //   t = (WIRE_NEAR - curr.z) / (next.z - curr.z)
-            float t = (WIRE_NEAR - in_cz[i]) / (in_cz[j] - in_cz[i]);
-            cx[out_nv] = in_cx[i] + t * (in_cx[j] - in_cx[i]);
-            cy[out_nv] = in_cy[i] + t * (in_cy[j] - in_cy[i]);
-            cz[out_nv] = WIRE_NEAR;
-            u[out_nv]  = in_u[i]  + t * (in_u[j]  - in_u[i]);
-            v[out_nv]  = in_v[i]  + t * (in_v[j]  - in_v[i]);
-            r[out_nv]  = in_r[i]  + t * (in_r[j]  - in_r[i]);
-            g[out_nv]  = in_g[i]  + t * (in_g[j]  - in_g[i]);
-            b[out_nv]  = in_b[i]  + t * (in_b[j]  - in_b[i]);
-            out_nv++;
-        }
+
+        use_cx    = cx; use_cy    = cy; use_cz    = cz;
+        use_u     = cu; use_v     = cv;
+        use_light = cl;
     }
 
     // If clipping eliminated everything, skip
@@ -1293,10 +1329,21 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
 
     int needed = (out_nv - 2) * 3;
     if (world_vbo_count + needed > WIRE_MAX_VERTS) return;
+      */
 
-    // Get/create a batch for this texture. If the previous draw used the
-    // same texture, extend that batch (zero-cost coalescing). Otherwise
-    // start a new batch.
+    //testing
+  
+    float *use_cx, *use_cy, *use_cz;
+    float *use_u,  *use_v;
+    float *use_light;
+    int out_nv;
+    use_cx    = in_cx;    use_cy    = in_cy;    use_cz    = in_cz;
+    use_u     = in_u;     use_v     = in_v;
+    use_light = in_light;
+    out_nv = nv;
+    int needed = (out_nv - 2) * 3;
+
+    // Get/create batch
     world_batch_t* batch;
     if (world_last_tex == gt->tex && world_batch_count > 0) {
         batch = &world_batches[world_batch_count - 1];
@@ -1308,14 +1355,19 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
         batch->vert_count = 0;
         world_last_tex = gt->tex;
     }
+    t_clip += svcGetSystemTick() - t0;
 
-    // Fan triangulation of the clipped polygon
+    // Fan triangulation
+    t0 = svcGetSystemTick();
     for (int i = 1; i < out_nv - 1; i++) {
-        world_emit_vert(cx[0],   cy[0],   cz[0],   u[0],   v[0],   r[0],   g[0],   b[0]);
-        world_emit_vert(cx[i],   cy[i],   cz[i],   u[i],   v[i],   r[i],   g[i],   b[i]);
-        world_emit_vert(cx[i+1], cy[i+1], cz[i+1], u[i+1], v[i+1], r[i+1], g[i+1], b[i+1]);
+      world_emit_vert(use_cx[0],   use_cy[0],   use_cz[0],   use_u[0],   use_v[0],   use_light[0],   0xFFFFFFFF);
+      world_emit_vert(use_cx[i],   use_cy[i],   use_cz[i],   use_u[i],   use_v[i],   use_light[i],   0xFFFFFFFF);
+      world_emit_vert(use_cx[i+1], use_cy[i+1], use_cz[i+1], use_u[i+1], use_v[i+1], use_light[i+1], 0xFFFFFFFF);
     }
     batch->vert_count += needed;
+
+    t_emit += svcGetSystemTick() - t0;
+    tmap_ticks += svcGetSystemTick() - t1;
 }
 
 #endif // WORLD_MODE
@@ -1453,8 +1505,9 @@ static void emit_sprite_quad(grs_bitmap* bm,
     float su3 = u3, sv3 = v3;
 
     // Compute lighting RGB
-    float r, g, b;
-    light_to_rgb(light, &r, &g, &b);
+    float brightness = (float)light * (1.0f / 65536.0f);
+    if (brightness < 0.0f) brightness = 0.0f;
+    if (brightness > 1.0f) brightness = 1.0f;
 
     // Near-plane clipping for 4-vertex polygon
     float in_cx[4] = {x0, x1, x2, x3};
@@ -1462,6 +1515,8 @@ static void emit_sprite_quad(grs_bitmap* bm,
     float in_cz[4] = {z0, z1, z2, z3};
     float in_u [4] = {su0, su1, su2, su3};
     float in_v [4] = {sv0, sv1, sv2, sv3};
+    float in_light[4] = {brightness, brightness, brightness, brightness};
+    float cl[6];
 
     float cx[6], cy[6], cz[6], u[6], v[6];
     int out_nv = 0;
@@ -1471,7 +1526,7 @@ static void emit_sprite_quad(grs_bitmap* bm,
         bool next_in = in_cz[j] >= WIRE_NEAR;
         if (curr_in) {
             cx[out_nv] = in_cx[i]; cy[out_nv] = in_cy[i]; cz[out_nv] = in_cz[i];
-            u[out_nv]  = in_u[i];  v[out_nv]  = in_v[i];
+            u[out_nv]  = in_u[i];  v[out_nv]  = in_v[i];  cl[out_nv] = in_light[i];
             out_nv++;
         }
         if (curr_in != next_in) {
@@ -1481,6 +1536,7 @@ static void emit_sprite_quad(grs_bitmap* bm,
             cz[out_nv] = WIRE_NEAR;
             u[out_nv]  = in_u[i]  + t * (in_u[j]  - in_u[i]);
             v[out_nv]  = in_v[i]  + t * (in_v[j]  - in_v[i]);
+            cl[out_nv] = in_light[i] + t * (in_light[j] - in_light[i]);
             out_nv++;
         }
     }
@@ -1504,9 +1560,9 @@ static void emit_sprite_quad(grs_bitmap* bm,
 
     // Fan triangulate
     for (int i = 1; i < out_nv - 1; i++) {
-        world_emit_vert(cx[0],   cy[0],   cz[0],   u[0],   v[0],   r, g, b);
-        world_emit_vert(cx[i],   cy[i],   cz[i],   u[i],   v[i],   r, g, b);
-        world_emit_vert(cx[i+1], cy[i+1], cz[i+1], u[i+1], v[i+1], r, g, b);
+      world_emit_vert(cx[0],   cy[0],   cz[0],   u[0],   v[0],   cl[0], 0xFFFFFFFF);
+      world_emit_vert(cx[i],   cy[i],   cz[i],   u[i],   v[i],   cl[i], 0xFFFFFFFF);
+      world_emit_vert(cx[i+1], cy[i+1], cz[i+1], u[i+1], v[i+1], cl[i+1], 0xFFFFFFFF);
     }
     batch->vert_count += needed;
 }
@@ -1820,6 +1876,8 @@ static void update_packed_palette(void) {
     }
 }
 
+extern u64 xform_ticks;
+extern u64 polygon_ticks;
 void bitblt_to_screen(void)
 {
   if (!aptMainLoop()) {
@@ -1939,16 +1997,16 @@ C3D_TexFlush(&back_tex);
 
     //printf("Rendered %d polygons\n", poly_count);
     // Print counters every 30 frames to reduce spam
-    static int print_throttle = 0;
-    if (++print_throttle >= 30) {
-        print_throttle = 0;
-        printf("polys=%d preload=%d hash=%d dynUp=%d compUp=%d compReuse=%d fail=%d\n",
-               poly_count,
-               frame_preloaded_hits, frame_hash_hits,
-               frame_dynamic_uploads,
-               frame_composite_uploads, frame_composite_reuses,
-               frame_lookup_failures);
-    }
+    // static int print_throttle = 0;
+    // if (++print_throttle >= 30) {
+    //     print_throttle = 0;
+    //     printf("polys=%d preload=%d hash=%d dynUp=%d compUp=%d compReuse=%d fail=%d\n",
+    //            poly_count,
+    //            frame_preloaded_hits, frame_hash_hits,
+    //            frame_dynamic_uploads,
+    //            frame_composite_uploads, frame_composite_reuses,
+    //            frame_lookup_failures);
+    // }
 
     poly_count = 0;
     frame_preloaded_hits = 0;
@@ -1961,15 +2019,30 @@ C3D_TexFlush(&back_tex);
     // Reset world buffer for next frame
     world_frame_begin();
 
-    // printf("init %f ms, upload %f ms, pre-draw %f ms, draw(left) %f ms, draw(right) %f ms, cleanup %f ms\n",
-    //        (t1 - t0) / (double)CPU_TICKS_PER_MSEC,
-    //         (t2 - t1) / (double)CPU_TICKS_PER_MSEC,
-    //         (t3 - t2) / (double)CPU_TICKS_PER_MSEC,
-    //         (t4 - t3) / (double)CPU_TICKS_PER_MSEC,
-    //         (t5 - t4) / (double)CPU_TICKS_PER_MSEC,
-    //         (svcGetSystemTick() - t5) / (double)CPU_TICKS_PER_MSEC);
+     printf("init %f ms, upload %f ms, pre-draw %f ms, draw(left) %f ms, draw(right) %f ms, cleanup %f ms\n",
+            (t1 - t0) / (double)CPU_TICKS_PER_MSEC,
+             (t2 - t1) / (double)CPU_TICKS_PER_MSEC,
+             (t3 - t2) / (double)CPU_TICKS_PER_MSEC,
+             (t4 - t3) / (double)CPU_TICKS_PER_MSEC,
+             (t5 - t4) / (double)CPU_TICKS_PER_MSEC,
+             (svcGetSystemTick() - t5) / (double)CPU_TICKS_PER_MSEC);
 
+    // printf("xform: %f ms, poly: %f ms, tmap: %f ms\n",
+    //        xform_ticks / (double)CPU_TICKS_PER_MSEC,
+    //        polygon_ticks / (double)CPU_TICKS_PER_MSEC,
+    //        tmap_ticks / (double)CPU_TICKS_PER_MSEC);
+    // xform_ticks = 0;
+    // polygon_ticks = 0;
+    // tmap_ticks = 0;
+  
+    // printf("tmap %f ms: t_lookup %f ms, t_convert %f ms, t_clip %f ms, t_emit %f ms\n",
+    //        tmap_ticks / (double)CPU_TICKS_PER_MSEC,
+    //        t_lookup / (double)CPU_TICKS_PER_MSEC,
+    //        t_convert / (double)CPU_TICKS_PER_MSEC,
+    //        t_clip / (double)CPU_TICKS_PER_MSEC,
+    //        t_emit / (double)CPU_TICKS_PER_MSEC);
 
+    // tmap_ticks = 0; t_lookup = 0; t_convert = 0; t_clip = 0; t_emit = 0;
 }
 
 #endif // RENDER_MODE branch
