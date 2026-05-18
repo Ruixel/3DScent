@@ -905,6 +905,12 @@ static void world_setup_state(void)
 
 // Flush all accumulated world geometry to the screen.
 // Called from bitblt_to_screen after the bitblt quad is drawn (inside frame).
+static int batch_compare(const void* a, const void* b) {
+    const world_batch_t* ba = (const world_batch_t*)a;
+    const world_batch_t* bb = (const world_batch_t*)b;
+    return (ba->tex > bb->tex) - (ba->tex < bb->tex);
+}
+
 static void world_frame_end(void)
 {
     if (world_vbo_count == 0) return;
@@ -912,25 +918,25 @@ static void world_frame_end(void)
     world_setup_state();
 
 #if WORLD_MODE == WORLD_MODE_WIREFRAME
-    // Single draw call for all line segments
     C3D_DrawArrays(GPU_TRIANGLES, 0, world_vbo_count);
 #else
-    // One draw call per accumulated batch (one per unique texture run).
-    printf("Drawing %d world batches, %d verts\n", world_batch_count, world_vbo_count);
-int unique_tex = 0;
-C3D_Tex* seen[WORLD_MAX_BATCHES];
-for (int i = 0; i < world_batch_count; i++) {
-    bool found = false;
-    for (int j = 0; j < unique_tex; j++)
-        if (seen[j] == world_batches[i].tex) { found = true; break; }
-    if (!found) seen[unique_tex++] = world_batches[i].tex;
-}
-printf("unique textures: %d\n", unique_tex);
-    for (int i = 0; i < world_batch_count; i++) {
-        world_batch_t* b = &world_batches[i];
-        if (b->vert_count == 0) continue;
-        C3D_TexBind(0, b->tex);
-        C3D_DrawArrays(GPU_TRIANGLES, b->vert_start, b->vert_count);
+    // Sort batches by texture pointer
+    qsort(world_batches, world_batch_count, sizeof(world_batch_t), batch_compare);
+
+    // Draw with merging of consecutive same-texture batches
+    int i = 0;
+    while (i < world_batch_count) {
+        if (world_batches[i].vert_count == 0) { i++; continue; }
+        
+        C3D_Tex* cur_tex = world_batches[i].tex;
+        C3D_TexBind(0, cur_tex);
+        
+        // Merge all consecutive batches with same texture
+        while (i < world_batch_count && world_batches[i].tex == cur_tex) {
+            if (world_batches[i].vert_count > 0)
+                C3D_DrawArrays(GPU_TRIANGLES, world_batches[i].vert_start, world_batches[i].vert_count);
+            i++;
+        }
     }
 #endif
 }
@@ -1171,8 +1177,10 @@ u64 t_lookup = 0, t_convert = 0, t_clip = 0, t_emit = 0;
 ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
                                 g3s_uvl* uvl_list, grs_bitmap* bm)
 {
-    u64 t0 = svcGetSystemTick();
-    u64 t1 = t0;
+    #ifdef DEBUG_TIMING
+      u64 t0 = svcGetSystemTick();
+      u64 t1 = t0;
+    #endif
     if (nv < 3 || !bm) return;
     if (nv > WORLD_MAX_POLY_VERTS) nv = WORLD_MAX_POLY_VERTS;
 
@@ -1240,12 +1248,14 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
         return;
     }
 
-    t_lookup += svcGetSystemTick() - t0;
-
+    #ifdef DEBUG_TIMING
+      t_lookup += svcGetSystemTick() - t0;
+      t0 = svcGetSystemTick();
+    #endif
     // Convert camera-space fixed-point to float. The GPU vertex shader will
     // apply our perspective projection matrix, doing the perspective divide
     // and producing perspective-correct UV interpolation as a side effect.
-    t0 = svcGetSystemTick();
+  
     float in_cx[WORLD_MAX_POLY_VERTS], in_cy[WORLD_MAX_POLY_VERTS], in_cz[WORLD_MAX_POLY_VERTS];
     float in_u [WORLD_MAX_POLY_VERTS], in_v [WORLD_MAX_POLY_VERTS];
     float in_light[WORLD_MAX_POLY_VERTS];
@@ -1260,7 +1270,10 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
         if (in_light[i] < 0.0f) in_light[i] = 0.0f;
         if (in_light[i] > 1.0f) in_light[i] = 1.0f;
     }
-    t_convert += svcGetSystemTick() - t0;
+    #ifdef DEBUG_TIMING
+      t_convert += svcGetSystemTick() - t0;
+      t0 = svcGetSystemTick();
+    #endif
 
     // -------------------------------------------------------------------------
     // Near-plane clipping (Sutherland-Hodgman).
@@ -1272,7 +1285,6 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
     // Output may have up to nv+1 vertices (each behind-to-front transition
     // adds one). We size the output buffer accordingly.
     // -------------------------------------------------------------------------
-    t0 = svcGetSystemTick();
     /*
     #define CLIP_MAX_OUT (WORLD_MAX_POLY_VERTS + 2)
     float *use_cx, *use_cy, *use_cz;
@@ -1355,10 +1367,13 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
         batch->vert_count = 0;
         world_last_tex = gt->tex;
     }
-    t_clip += svcGetSystemTick() - t0;
+
+    #ifdef DEBUG_TIMING
+      t_clip += svcGetSystemTick() - t0;
+      t0 = svcGetSystemTick();
+    #endif
 
     // Fan triangulation
-    t0 = svcGetSystemTick();
     for (int i = 1; i < out_nv - 1; i++) {
       world_emit_vert(use_cx[0],   use_cy[0],   use_cz[0],   use_u[0],   use_v[0],   use_light[0],   0xFFFFFFFF);
       world_emit_vert(use_cx[i],   use_cy[i],   use_cz[i],   use_u[i],   use_v[i],   use_light[i],   0xFFFFFFFF);
@@ -1366,8 +1381,10 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
     }
     batch->vert_count += needed;
 
-    t_emit += svcGetSystemTick() - t0;
-    tmap_ticks += svcGetSystemTick() - t1;
+    #ifdef DEBUG_TIMING
+      t_emit += svcGetSystemTick() - t0;
+      tmap_ticks += svcGetSystemTick() - t1;
+    #endif
 }
 
 #endif // WORLD_MODE
@@ -1883,8 +1900,10 @@ void bitblt_to_screen(void)
   if (!aptMainLoop()) {
     printf("TODO: Shutdown handling\n");
   }
-    u64 t0, t1, t2, t3, t4, t5;
-    t0 = svcGetSystemTick();
+    #ifdef DEBUG_TIMING
+      u64 t0, t1, t2, t3, t4, t5;
+      t0 = svcGetSystemTick();
+    #endif
     hidScanInput();
     keyboard_handler();
 
@@ -1936,7 +1955,9 @@ C3D_TexFlush(&back_tex);
 #endif
 
 #if RENDER_MODE != RENDER_MODE_RAW_WRITE
-    t1 = svcGetSystemTick();
+    #ifdef DEBUG_TIMING
+      t1 = svcGetSystemTick();
+    #endif
     //tex_upload_software(&back_tex, (u32*)tex_buf, TEX_W, GAME_W, UPLOAD_H, TEX_W);
 #endif
 
@@ -1945,7 +1966,9 @@ C3D_TexFlush(&back_tex);
     // it to an interocular distance (IOD). The /3 divisor matches the
     // citro3d sample's "tame the effect" tweak — full slider produces a
     // comfortable depth feel without too much eye strain.
-    t2 = svcGetSystemTick();
+    #ifdef DEBUG_TIMING
+      t2 = svcGetSystemTick();
+    #endif
     float slider = osGet3DSliderState();
     float iod = slider / 3.0f;
     bool stereo = (iod > 0.0f);
@@ -1970,7 +1993,9 @@ C3D_TexFlush(&back_tex);
     // every frame; if GPU is still reading it during next frame's CPU
     // write, we'd see tearing in the bitblt area. If that happens, we
     // need to double-buffer back_tex.
-    t3 = svcGetSystemTick();
+    #ifdef DEBUG_TIMING
+      t3 = svcGetSystemTick();
+    #endif
     C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
 
     // ----- Left eye (always drawn) -----
@@ -1981,7 +2006,9 @@ C3D_TexFlush(&back_tex);
 #endif
     draw_screen_contents();
     
-    t4 = svcGetSystemTick();
+    #ifdef DEBUG_TIMING
+      t4 = svcGetSystemTick();
+    #endif
     // ----- Right eye (only if slider engaged) -----
     if (stereo) {
         C3D_RenderTargetClear(target_right, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
@@ -1993,7 +2020,9 @@ C3D_TexFlush(&back_tex);
     }
 
     C3D_FrameEnd(0);
-    t5 = svcGetSystemTick();
+    #ifdef DEBUG_TIMING
+      t5 = svcGetSystemTick();
+    #endif
 
     //printf("Rendered %d polygons\n", poly_count);
     // Print counters every 30 frames to reduce spam
@@ -2019,13 +2048,13 @@ C3D_TexFlush(&back_tex);
     // Reset world buffer for next frame
     world_frame_begin();
 
-     printf("init %f ms, upload %f ms, pre-draw %f ms, draw(left) %f ms, draw(right) %f ms, cleanup %f ms\n",
-            (t1 - t0) / (double)CPU_TICKS_PER_MSEC,
-             (t2 - t1) / (double)CPU_TICKS_PER_MSEC,
-             (t3 - t2) / (double)CPU_TICKS_PER_MSEC,
-             (t4 - t3) / (double)CPU_TICKS_PER_MSEC,
-             (t5 - t4) / (double)CPU_TICKS_PER_MSEC,
-             (svcGetSystemTick() - t5) / (double)CPU_TICKS_PER_MSEC);
+     // printf("init %f ms, upload %f ms, pre-draw %f ms, draw(left) %f ms, draw(right) %f ms, cleanup %f ms\n",
+     //        (t1 - t0) / (double)CPU_TICKS_PER_MSEC,
+     //         (t2 - t1) / (double)CPU_TICKS_PER_MSEC,
+     //         (t3 - t2) / (double)CPU_TICKS_PER_MSEC,
+     //         (t4 - t3) / (double)CPU_TICKS_PER_MSEC,
+     //         (t5 - t4) / (double)CPU_TICKS_PER_MSEC,
+     //         (svcGetSystemTick() - t5) / (double)CPU_TICKS_PER_MSEC);
 
     // printf("xform: %f ms, poly: %f ms, tmap: %f ms\n",
     //        xform_ticks / (double)CPU_TICKS_PER_MSEC,
