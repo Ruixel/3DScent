@@ -44,7 +44,7 @@ int Max_perspective_depth, Max_linear_depth, Current_seg_depth;
 // -----------------------------------------------------------------------------
 // Framebuffer state shared with game code
 // -----------------------------------------------------------------------------
-u8 back_buffer[400 * 240];
+u8          back_buffer[400 * 240];
 u16         ds_palette[256];
 int         palette_updated;
 bool        doSleep;
@@ -1192,10 +1192,10 @@ static void draw_screen_contents(void)
 static u32  packed_palette[256];
 static u8   last_palette[768];
 
-static void update_packed_palette(void)
+static bool update_packed_palette(void)
 {
     extern ubyte gr_current_pal[];
-    if (memcmp(last_palette, gr_current_pal, 768) == 0) return;
+    if (memcmp(last_palette, gr_current_pal, 768) == 0) return false;
     memcpy(last_palette, gr_current_pal, 768);
 
     for (int i = 0; i < 256; i++) {
@@ -1205,9 +1205,12 @@ static void update_packed_palette(void)
         u8 a = (i == 0) ? 0x00 : 0xFF;
         packed_palette[i] = ((u32)r << 24) | ((u32)g << 16) | ((u32)b << 8) | a;
     }
+
+  return true;
 }
 
 TIMER_DECL(bitblt_ticks);
+static u8 back_buffer_prev[GAME_W * GAME_H];
 
 void bitblt_to_screen(void)
 {
@@ -1220,7 +1223,7 @@ void bitblt_to_screen(void)
     hidScanInput();
     keyboard_handler();
 
-    update_packed_palette();
+    bool palette_updated = update_packed_palette();
     if (!swizzle_lut_init) init_swizzle_lut();
 
     // -------- Bitblt: palette indices -> tiled RGBA texture --------
@@ -1229,8 +1232,20 @@ void bitblt_to_screen(void)
 
     for (int ty = 0; ty < GAME_H / 8; ty++) {
         for (int tx = 0; tx < GAME_W / 8; tx++) {
+            __builtin_prefetch(back_buffer + (ty * 8) * GAME_W + (tx + 2) * 8, 0, 0);
+
             u32* tile_dst = dst + (ty * tiles_per_row + tx) * 64;
             const u8* tile_src = back_buffer + (ty * 8) * GAME_W + (tx * 8);
+            const u8* tile_prev = back_buffer_prev + (ty * 8) * GAME_W + (tx * 8);
+
+            // Check all 8 rows of this tile
+            if (!palette_updated) {
+              bool dirty = false;
+              for (int py = 0; py < 8 && !dirty; py++)
+                  dirty = memcmp(tile_src + py * GAME_W, tile_prev + py * GAME_W, 8) != 0;
+
+              if (!dirty) continue;
+            }
 
             for (int py = 0; py < 8; py++) {
                 const u8* row_src = tile_src + py * GAME_W;
@@ -1246,6 +1261,7 @@ void bitblt_to_screen(void)
             }
         }
     }
+    memcpy(back_buffer_prev, back_buffer, GAME_W * GAME_H);
     C3D_TexFlush(&back_tex);
 
     TIMER_ADD(bitblt_ticks, t_bitblt);
