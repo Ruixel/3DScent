@@ -749,7 +749,6 @@ void init_cockpit()
 	switch( Cockpit_mode )
 	{
 	case CM_FULL_SCREEN:
-		nds_set_render_size (0, 0, 255, 191);
 		VR_screen_pages[0].cv_bitmap.bm_x = 0;
 		VR_screen_pages[0].cv_bitmap.bm_y = 0;
 		VR_screen_pages[0].cv_bitmap.bm_w = 320;
@@ -763,7 +762,6 @@ void init_cockpit()
 		break;
 
 	case CM_LETTERBOX:
-		nds_set_render_size (0, 24, 255, 147);
 		VR_screen_pages[0].cv_bitmap.bm_x = 0;
 		VR_screen_pages[0].cv_bitmap.bm_y = 24;
 		VR_screen_pages[0].cv_bitmap.bm_w = 320;

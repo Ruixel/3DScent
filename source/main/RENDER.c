@@ -951,7 +951,6 @@ ITCM_CODE void render_start_frame()
 		RL_framecount=1;											//and set this frame to 1
 	}
 
-  ds_start_frame();
 }
 
 //Given a lit of point numbers, rotate any that haven't been rotated this frame
@@ -1785,7 +1784,6 @@ ITCM_CODE void render_frame(fix eye_offset)
 		draw_3d_reticle(eye_offset);
 #endif
 	g3_end_frame();
-  ds_end_frame();
 
 	FrameCount++;		//we have rendered a frame
 }

@@ -1,20 +1,57 @@
-#ifndef __NDSFUNC_H__
-#define __NDSFUNC_H__
+#pragma once
 
-#ifndef ALIGN
-#define ALIGN(n) __attribute__((aligned(n)))
-#endif
-#ifndef ITCM_CODE
-#define ITCM_CODE
-#endif
-
+#include <stdbool.h>
+#include <stdint.h>
+#include "3ds.h"
+#include "fix.h"
+#include "gr.h"
 #include "3d.h"
 
-void set_main_lcd (int top);
-ITCM_CODE void bitblt_to_screen();
-void delay (int time);
-void nds_init ();
-void nds_set_render_size (int x, int y, int w, int h);
-void init_nds_textures ();
+// -----------------------------------------------------------------------------
+// Framebuffer state
+// -----------------------------------------------------------------------------
+extern u8   back_buffer[400 * 240];
+extern u16  ds_palette[256];
+extern int  palette_updated;
+extern bool doSleep;
 
-#endif
+// -----------------------------------------------------------------------------
+// Lighting (read by game code)
+// -----------------------------------------------------------------------------
+extern int Lighting_on;
+extern int Max_perspective_depth;
+extern int Max_linear_depth;
+extern int Current_seg_depth;
+
+// -----------------------------------------------------------------------------
+// GPU state
+// -----------------------------------------------------------------------------
+extern bool gpu_inited;
+
+// -----------------------------------------------------------------------------
+// Init
+// -----------------------------------------------------------------------------
+void init_3ds_gpu(void);
+void init_nds_textures(void);
+void sceneInit(void);
+
+// -----------------------------------------------------------------------------
+// Per-frame
+// -----------------------------------------------------------------------------
+void bitblt_to_screen(void);
+
+// -----------------------------------------------------------------------------
+// Rendering hooks called by Descent's game/object code
+// -----------------------------------------------------------------------------
+typedef void (*g3_draw_tmap_func_t)(int nv, vms_vector** pointlist,
+                                    g3s_uvl* uvl_list, grs_bitmap* bm);
+
+extern g3_draw_tmap_func_t g3_draw_tmap_func;
+
+void g3_draw_poly(int nv, vms_vector** pointlist);
+void g3_draw_poly_flat_color(int nv, vms_vector** pointlist, int color_idx);
+void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
+                      g3s_uvl* uvl_list, grs_bitmap* bm);
+void g3_draw_tmap_flat(int nv, vms_vector** pointlist,
+                       g3s_uvl* uvl_list, grs_bitmap* bm);
+void g3_draw_bitmap(vms_vector* pos, fix width, fix height, grs_bitmap* bm);

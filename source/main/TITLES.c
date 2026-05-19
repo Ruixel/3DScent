@@ -676,7 +676,7 @@ void init_spinning_robot(void)
 	Robot_pitch_value = 90;
 
 //	Robot_canv = gr_create_sub_canvas(grd_curcanv, 138, 55, 117, 97);
-	nds_set_render_size (138, 55, 117, 97);
+	//nds_set_render_size (138, 55, 117, 97);
 }
 
 //	-----------------------------------------------------------------------------

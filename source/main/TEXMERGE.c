@@ -288,7 +288,7 @@ grs_bitmap * texmerge_get_cached_bitmap( int tmap_bottom, int tmap_top )
 	return Cache[least_recently_used].bitmap;
 }
 
-int find_bitmap_in_vram (int key);
+//int find_bitmap_in_vram (int key);
 
 grs_bitmap * texmerge_get_cached_bitmap_maybe_vram ( int tmap_bottom, int tmap_top )
 {
@@ -297,13 +297,13 @@ grs_bitmap * texmerge_get_cached_bitmap_maybe_vram ( int tmap_bottom, int tmap_t
 	orient = ((tmap_top & 0xC000) >> 14) & 3;
 	key = (orient << 30) | (Textures[tmap_top&0x3FFF].index << 16) | Textures[tmap_bottom].index;
 
-	tex = find_bitmap_in_vram (key);
-	if (tex != -1)
-	{
-		texmerge_in_vram.texname = tex;
-		texmerge_in_vram.key = key;
-		return &texmerge_in_vram;
-	}
+	//tex = find_bitmap_in_vram (key);
+	// if (tex != -1)
+	// {
+	// 	texmerge_in_vram.texname = tex;
+	// 	texmerge_in_vram.key = key;
+	// 	return &texmerge_in_vram;
+	// }
 
 	return texmerge_get_cached_bitmap (tmap_bottom, tmap_top);
 }
