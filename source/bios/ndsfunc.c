@@ -100,7 +100,11 @@ bool gpu_inited = false;
 // Define DEBUG_TIMING to enable. Each TIMED_BLOCK accumulates into a u64
 // counter; PRINT_TIMING dumps and resets at frame end.
 // =============================================================================
-//#define DEBUG_TIMING
+#define DEBUG_TIMING
+
+#ifdef DEBUG_TIMING_DETAILED
+  #define DEBUG_TIMING  // auto-enable coarse timing
+#endif
 
 #ifdef DEBUG_TIMING
   #define TIMER_DECL(name)   static u64 name = 0
@@ -114,6 +118,16 @@ bool gpu_inited = false;
   #define TIMER_ADD(acc, t)
   #define TIMER_RESET(t)
   #define TIMER_MS(t)        0.0
+#endif
+
+#ifdef DEBUG_TIMING_DETAILED
+  #define TIMER_START_D(t)    TIMER_START(t)
+  #define TIMER_ADD_D(acc, t) TIMER_ADD(acc, t)
+  #define TIMER_RESET_D(t)    TIMER_RESET(t)
+#else
+  #define TIMER_START_D(t)
+  #define TIMER_ADD_D(acc, t)
+  #define TIMER_RESET_D(t)
 #endif
 
 // =============================================================================
@@ -809,11 +823,11 @@ TIMER_DECL(t_emit);
 ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
                                 g3s_uvl* uvl_list, grs_bitmap* bm)
 {
-    TIMER_START(t_total);
-    TIMER_START(t_phase);
-
     if (nv < 3 || !bm) return;
     if (nv > WORLD_MAX_POLY_VERTS) nv = WORLD_MAX_POLY_VERTS;
+
+    TIMER_START(t_total);
+    TIMER_START_D(t_phase);
 
     poly_count++;
 
@@ -872,8 +886,8 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
         return;
     }
 
-    TIMER_ADD(t_lookup, t_phase);
-    TIMER_RESET(t_phase);
+    TIMER_ADD_D(t_lookup, t_phase);
+    TIMER_RESET_D(t_phase);
 
     // Camera-space fixed -> float. The GPU vertex shader handles the
     // perspective divide, giving us perspective-correct UVs for free.
@@ -892,8 +906,8 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
         if (il[i] > 1.0f) il[i] = 1.0f;
     }
 
-    TIMER_ADD(t_convert, t_phase);
-    TIMER_RESET(t_phase);
+    TIMER_ADD_D(t_convert, t_phase);
+    TIMER_RESET_D(t_phase);
 
     int needed = (nv - 2) * 3;
     if (world_vbo_count + needed > WORLD_MAX_VERTS) return;
@@ -917,7 +931,7 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
     }
     batch->vert_count += needed;
 
-    TIMER_ADD(t_emit, t_phase);
+    TIMER_ADD_D(t_emit, t_phase);
     TIMER_ADD(tmap_ticks, t_total);
 }
 
@@ -1210,6 +1224,8 @@ static bool update_packed_palette(void)
 }
 
 TIMER_DECL(bitblt_ticks);
+TIMER_DECL(render_left_ticks);
+TIMER_DECL(render_right_ticks);
 static u8 back_buffer_prev[GAME_W * GAME_H];
 
 void bitblt_to_screen(void)
@@ -1275,6 +1291,8 @@ void bitblt_to_screen(void)
     // Flush world_vbo from CPU cache so GPU sees fresh data. Without this,
     // stereo can sample stale cache lines because the right-eye draws are
     // submitted later and timing differences expose the coherency hole.
+  
+    TIMER_START(t_left);
     if (world_vbo_count > 0) {
         GSPGPU_FlushDataCache(world_vbo, sizeof(world_vertex) * world_vbo_count);
     }
@@ -1293,28 +1311,34 @@ void bitblt_to_screen(void)
     C3D_FrameDrawOn(target_left);
     world_build_projection(stereo ? -iod : 0.0f);
     draw_screen_contents();
+    TIMER_ADD(render_left_ticks, t_left);
 
     // -------- Right eye (only if slider engaged) --------
+    TIMER_START(t_right);
     if (stereo) {
         C3D_RenderTargetClear(target_right, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
         C3D_FrameDrawOn(target_right);
         world_build_projection(iod);
         draw_screen_contents();
     }
+    TIMER_ADD(render_right_ticks, t_right);
 
     C3D_FrameEnd(0);
 
 #ifdef DEBUG_TIMING
-    printf("polys=%d preload=%d hash=%d dynUp=%d compUp=%d compReuse=%d fail=%d\n",
-           poly_count,
-           frame_preloaded_hits, frame_hash_hits,
-           frame_dynamic_uploads,
-           frame_composite_uploads, frame_composite_reuses,
-           frame_lookup_failures);
+    // printf("polys=%d preload=%d hash=%d dynUp=%d compUp=%d compReuse=%d fail=%d\n",
+    //        poly_count,
+    //        frame_preloaded_hits, frame_hash_hits,
+    //        frame_dynamic_uploads,
+    //        frame_composite_uploads, frame_composite_reuses,
+    //        frame_lookup_failures);
     printf("bitblt %.2f ms, tmap %.2f ms (lookup %.2f, convert %.2f, emit %.2f)\n",
            TIMER_MS(bitblt_ticks),
            TIMER_MS(tmap_ticks), TIMER_MS(t_lookup), TIMER_MS(t_convert), TIMER_MS(t_emit));
-    bitblt_ticks = 0;
+    printf("render left %.2f ms, render right %.2f ms\n",
+           TIMER_MS(render_left_ticks), TIMER_MS(render_right_ticks));
+    printf("world_vbo_count=%d\n", world_vbo_count);
+    bitblt_ticks = 0; render_left_ticks = 0; render_right_ticks = 0;
     tmap_ticks = 0; t_lookup = 0; t_convert = 0; t_emit = 0;
 #endif
 
