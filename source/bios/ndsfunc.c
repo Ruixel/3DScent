@@ -183,6 +183,22 @@ static int frame_composite_uploads = 0;  // texmerge composite uploaded/re-uploa
 static int frame_composite_reuses = 0;   // composite tracked, key matched, no upload
 static int frame_lookup_failures = 0;    // lookup ended in log_missing_bitmap
 
+static u8 swizzle_lut[64];  // maps py*8+px -> z
+static bool swizzle_lut_init = false;
+
+static void init_swizzle_lut(void) {
+    for (int py = 0; py < 8; py++) {
+        for (int px = 0; px < 8; px++) {
+            int z = (px & 1)        | ((py & 1) << 1) |
+                    ((px & 2) << 1) | ((py & 2) << 2) |
+                    ((px & 4) << 2) | ((py & 4) << 3);
+            swizzle_lut[py * 8 + px] = z;
+        }
+    }
+    swizzle_lut_init = true;
+}
+
+
 // -----------------------------------------------------------------------------
 // Texmerge composite tracking
 //
@@ -340,18 +356,16 @@ static inline u16 palette_to_rgba5551(int idx, ubyte* palette, bool transparent_
 static void tex_upload_5551(C3D_Tex* tex, const u16* src_linear,
                             int src_w, int src_h, int tex_w)
 {
+    if (!swizzle_lut_init) init_swizzle_lut();
+    
     u16* dst = (u16*)tex->data;
     int tiles_per_row = tex_w / 8;
 
-    // Zero out the entire texture first (in case src_w/h < tex_w/h)
     memset(dst, 0, tex_w * tex->height * sizeof(u16));
 
     for (int y = 0; y < src_h; y++) {
         for (int x = 0; x < src_w; x++) {
-            int px = x & 7, py = y & 7;
-            int z = (px & 1)        | ((py & 1) << 1) |
-                    ((px & 2) << 1) | ((py & 2) << 2) |
-                    ((px & 4) << 2) | ((py & 4) << 3);
+            int z = swizzle_lut[(y & 7) * 8 + (x & 7)];
             int tile_idx = (y / 8) * tiles_per_row + (x / 8);
             dst[tile_idx * 64 + z] = src_linear[y * src_w + x];
         }
@@ -1727,21 +1741,6 @@ static const tex_vertex quad_list[] = {
 
 static C3D_Tex back_tex;
 static void*   tex_buf;
-
-static u8 swizzle_lut[64];  // maps py*8+px -> z
-static bool swizzle_lut_init = false;
-
-static void init_swizzle_lut(void) {
-    for (int py = 0; py < 8; py++) {
-        for (int px = 0; px < 8; px++) {
-            int z = (px & 1)        | ((py & 1) << 1) |
-                    ((px & 2) << 1) | ((py & 2) << 2) |
-                    ((px & 4) << 2) | ((py & 4) << 3);
-            swizzle_lut[py * 8 + px] = z;
-        }
-    }
-    swizzle_lut_init = true;
-}
 
 static void tex_upload_software(C3D_Tex* tex,
                                 const u32* src_linear, int src_stride,
