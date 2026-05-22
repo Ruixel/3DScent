@@ -100,7 +100,7 @@ bool gpu_inited = false;
 // Define DEBUG_TIMING to enable. Each TIMED_BLOCK accumulates into a u64
 // counter; PRINT_TIMING dumps and resets at frame end.
 // =============================================================================
-#define DEBUG_TIMING
+//#define DEBUG_TIMING
 
 #ifdef DEBUG_TIMING_DETAILED
   #define DEBUG_TIMING  // auto-enable coarse timing
@@ -632,9 +632,12 @@ static void world_build_projection(float iod)
 
 static bool world_frame_prepared = false;
 
+TIMER_DECL(p3d_wait_time);
 static void world_frame_begin(void)
 {
+    TIMER_START(p3d_t);
     gspWaitForP3D();
+    TIMER_ADD(p3d_wait_time, p3d_t);
 
     world_vbo_count = 0;
     world_batch_count = 0;
@@ -670,6 +673,12 @@ static void world_setup_state(void)
     C3D_TexEnvSrc(env, C3D_Both, GPU_TEXTURE0, GPU_PRIMARY_COLOR, 0);
     C3D_TexEnvFunc(env, C3D_Both, GPU_MODULATE);
 }
+
+// Forward-declare citro3d internals (from citro3d's internal.h)
+typedef struct C3D_Context_tag C3D_Context;
+extern C3D_Context* C3Di_GetContext(void);
+extern void C3Di_UpdateContext(void);
+extern void C3Di_SetTex(int unit, C3D_Tex* tex);
 
 static void world_frame_end(void)
 {
@@ -743,12 +752,37 @@ static void world_frame_end(void)
     }
 
     // Draw — runs every eye
-    for (int i = 0; i < world_batch_count; i++) {
+    // Per-frame draw setup (was emitted per-batch by C3D_DrawArrays)
+    C3D_TexBind(0, world_batches[0].tex);
+    C3Di_UpdateContext();  // full setup for first batch
+
+    GPUCMD_AddMaskedWrite(GPUREG_PRIMITIVE_CONFIG, 2, GPU_TRIANGLES);
+    GPUCMD_AddWrite(GPUREG_RESTART_PRIMITIVE, 1);
+    GPUCMD_AddWrite(GPUREG_INDEXBUFFER_CONFIG, 0x80000000);
+    GPUCMD_AddMaskedWrite(GPUREG_GEOSTAGE_CONFIG2, 1, 1);
+
+    // First batch
+    GPUCMD_AddWrite(GPUREG_NUMVERTICES, world_batches[0].vert_count);
+    GPUCMD_AddWrite(GPUREG_VERTEX_OFFSET, world_batches[0].vert_start);
+    GPUCMD_AddMaskedWrite(GPUREG_START_DRAW_FUNC0, 1, 0);
+    GPUCMD_AddWrite(GPUREG_DRAWARRAYS, 1);
+    GPUCMD_AddMaskedWrite(GPUREG_START_DRAW_FUNC0, 1, 1);
+    GPUCMD_AddWrite(GPUREG_VTX_FUNC, 1);
+
+    // Subsequent batches: only swap texture descriptor
+    for (int i = 1; i < world_batch_count; i++) {
         world_batch_t* batch = &world_batches[i];
-        C3D_TexBind(0, batch->tex);
-        C3D_DrawArrays(GPU_TRIANGLES, batch->vert_start, batch->vert_count);
+        C3Di_SetTex(0, batch->tex);
+        GPUCMD_AddWrite(GPUREG_NUMVERTICES, batch->vert_count);
+        GPUCMD_AddWrite(GPUREG_VERTEX_OFFSET, batch->vert_start);
+        GPUCMD_AddMaskedWrite(GPUREG_START_DRAW_FUNC0, 1, 0);
+        GPUCMD_AddWrite(GPUREG_DRAWARRAYS, 1);
+        GPUCMD_AddMaskedWrite(GPUREG_START_DRAW_FUNC0, 1, 1);
+        GPUCMD_AddWrite(GPUREG_VTX_FUNC, 1);
     }
-}
+
+    // Disable array drawing mode so subsequent draws (bitblt) start fresh
+    GPUCMD_AddMaskedWrite(GPUREG_GEOSTAGE_CONFIG2, 1, 0);}
 
 // =============================================================================
 // Flat-shaded polygons (OP_FLATPOLY)
@@ -1405,9 +1439,12 @@ void bitblt_to_screen(void)
         printf("flush %.2f ms, render left %.2f ms, render right %.2f ms\n",
                TIMER_MS(flush_ticks), TIMER_MS(render_left_ticks), TIMER_MS(render_right_ticks));
         printf("world_vbo_count=%d\n", world_vbo_count);
+        printf("world_batch_count=%d\n", world_batch_count);
+        printf("p3d waits=%.2f ms\n", TIMER_MS(p3d_wait_time));
     }
     bitblt_ticks = 0; render_left_ticks = 0; render_right_ticks = 0; flush_ticks = 0;
     tmap_ticks = 0; t_lookup = 0; t_convert = 0; t_emit = 0;
+    p3d_wait_time = 0;
 #endif
 
     poly_count = 0;
