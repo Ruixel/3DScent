@@ -100,7 +100,7 @@ bool gpu_inited = false;
 // Define DEBUG_TIMING to enable. Each TIMED_BLOCK accumulates into a u64
 // counter; PRINT_TIMING dumps and resets at frame end.
 // =============================================================================
-#define DEBUG_TIMING
+//#define DEBUG_TIMING
 //#define DEBUG_TIMING_DETAILED
 
 #ifdef DEBUG_TIMING_DETAILED
@@ -152,6 +152,7 @@ typedef struct {
     C3D_Tex* tex;        // NULL if not loaded
     float    u_scale;    // bm_w / pot_w (for non-POT bitmaps)
     float    v_scale;    // bm_h / pot_h
+    bool     owned;      // true if malloc'd
 } gpu_tex_entry_t;
 
 static gpu_tex_entry_t gpu_tex_pool[GPU_TEX_MAX];
@@ -399,6 +400,7 @@ static bool gpu_tex_upload_to_slot(grs_bitmap* bmp, int slot)
     gpu_tex_pool[slot].tex     = tex;
     gpu_tex_pool[slot].u_scale = (float)bmp->bm_w / (float)pot_w;
     gpu_tex_pool[slot].v_scale = (float)bmp->bm_h / (float)pot_h;
+    gpu_tex_pool[slot].owned   = true;
     gpu_tex_total_bytes += pot_w * pot_h * sizeof(u16);
     gpu_tex_loaded_count++;
 
@@ -437,20 +439,25 @@ static void gpu_tex_free_slot(int slot)
 {
     if (slot < 0 || slot >= GPU_TEX_MAX) return;
     if (!gpu_tex_pool[slot].tex) return;
-    C3D_TexDelete(gpu_tex_pool[slot].tex);
-    free(gpu_tex_pool[slot].tex);
-    gpu_tex_pool[slot].tex = NULL;
-    gpu_tex_loaded_count--;
+    if (gpu_tex_pool[slot].owned) {
+        C3D_TexDelete(gpu_tex_pool[slot].tex);
+        free(gpu_tex_pool[slot].tex);
+        gpu_tex_pool[slot].tex = NULL;
+        gpu_tex_pool[slot].owned = false;
+        gpu_tex_loaded_count--;
+    }
 }
 
 static void gpu_tex_free_all(void)
 {
     for (int i = 0; i < GPU_TEX_MAX; i++) {
-        if (gpu_tex_pool[i].tex) {
+        if (gpu_tex_pool[i].tex && gpu_tex_pool[i].owned) {
             C3D_TexDelete(gpu_tex_pool[i].tex);
             free(gpu_tex_pool[i].tex);
             gpu_tex_pool[i].tex = NULL;
+            gpu_tex_pool[i].owned = false;
         }
+        // Borrowed slots (e.g. white_tex_slot) survive the wipe.
     }
     bm_hash_clear();
     memset(texmerge_track, 0, sizeof(texmerge_track));
@@ -505,14 +512,6 @@ static void gpu_tex_preload_all(void)
            vramSpaceFree() / 1024, linearSpaceFree() / 1024);
 }
 
-// Called by piggy_bitmap_page_out_all() after every level load.
-void init_nds_textures(void)
-{
-    if (!gpu_inited) return;
-    gpu_tex_free_all();
-    gpu_tex_preload_all();
-}
-
 // =============================================================================
 // World renderer
 // =============================================================================
@@ -549,6 +548,8 @@ static int              world_vbo_count;
 static world_batch_t world_batches[WORLD_MAX_BATCHES];
 static int           world_batch_count;
 static int           world_last_slot = -1;
+static bool          world_frame_prepared = false;
+
 
 static int  current_tex_slot = 0;  // set before any emit_vert calls
 static u16* index_buf;          // linearAlloc'd, fed to DrawElements
@@ -567,6 +568,23 @@ static void world_init(void)
 
     index_buf = linearAlloc(WORLD_MAX_VERTS * sizeof(u16));
 }
+
+// Called by piggy_bitmap_page_out_all() after every level load.
+void init_nds_textures(void)
+{
+    if (!gpu_inited) return;
+    
+    // Discard any pending verts that reference the old texture pool
+    world_vbo_count = 0;
+    world_batch_count = 0;
+    world_last_slot = -1;
+    world_frame_prepared = false;
+    orphan_slot_count = 0;  // these slots are about to be freed anyway
+    
+    gpu_tex_free_all();
+    gpu_tex_preload_all();
+}
+
 
 static inline void world_emit_vert(float x, float y, float z,
                                    float u, float v, float light, u32 color)
@@ -643,8 +661,6 @@ static void world_build_projection(float iod)
     Mtx_Multiply(&tmp, &remap, &world_projection);
     world_projection = tmp;
 }
-
-static bool world_frame_prepared = false;
 
 TIMER_DECL(p3d_wait_time);
 static void world_frame_begin(void)
@@ -829,6 +845,7 @@ static void white_tex_init(void)
     gpu_tex_pool[white_tex_slot].tex     = &white_tex;
     gpu_tex_pool[white_tex_slot].u_scale = 1.0f;
     gpu_tex_pool[white_tex_slot].v_scale = 1.0f;
+    gpu_tex_pool[white_tex_slot].owned   = false;
 
     white_tex_ready = true;
 }
