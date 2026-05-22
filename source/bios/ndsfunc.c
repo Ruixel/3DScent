@@ -1388,10 +1388,14 @@ TIMER_DECL(render_left_ticks);
 TIMER_DECL(render_right_ticks);
 static u8 back_buffer_prev[GAME_W * GAME_H];
 
+extern bool exit_requested;
+extern jmp_buf exit_jmp;
+
 void bitblt_to_screen(void)
 {
-    if (!aptMainLoop()) {
-        printf("TODO: Shutdown handling\n");
+    if (!aptMainLoop() && !exit_requested) {
+        exit_requested = true;
+        longjmp(exit_jmp, 1);  // unwinds the stack back to setjmp
     }
 
     TIMER_START(t_bitblt);

@@ -371,26 +371,25 @@ void initOggPlayer(void) {
 }
 
 void shutdownOggPlayer(void) {
+    // Stop ndsp from invoking our callback during teardown
+    ndspSetCallback(NULL, NULL);
+    
     // Signal audio thread to quit
     s_quit = true;
     LightEvent_Signal(&s_event);
 
-    // Free the audio thread
+    // Wait for the audio thread to finish
     if (s_threadId) {
-      threadJoin(s_threadId, UINT64_MAX);
-      threadFree(s_threadId);
-      s_threadId = 0;
+        threadJoin(s_threadId, UINT64_MAX);
+        threadFree(s_threadId);
+        s_threadId = 0;
     }
 
     LightLock_Lock(&s_vfLock);
     if (s_oggReady) {
-      s_oggReady = false;
-      ov_clear(&s_vorbisFile);
+        s_oggReady = false;
+        ov_clear(&s_vorbisFile);
     }
-
-    // Cleanup audio things and de-init platform features
     audioExit();
-
     LightLock_Unlock(&s_vfLock);
-    LightLock_Destroy(&s_vfLock);
 }

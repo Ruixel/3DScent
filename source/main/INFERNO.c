@@ -649,6 +649,7 @@ static char copyright[] = "DESCENT   COPYRIGHT (C) 1994,1995 PARALLAX SOFTWARE C
 #include <time.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <setjmp.h>
 
 #include "gr.h"
 //#include "ui.h"
@@ -716,6 +717,9 @@ static char copyright[] = "DESCENT   COPYRIGHT (C) 1994,1995 PARALLAX SOFTWARE C
 #include "vers_id.h"
 
 //extern int Game_simuleyes_flag;
+
+jmp_buf exit_jmp;
+bool exit_requested = false;
 
 static const char desc_id_checksum_str[] = DESC_ID_CHKSUM;
 char desc_id_exit_num = 0;
@@ -1130,45 +1134,10 @@ printf("show_pcx: calling pcx_read_bitmap '%s'\n", filename); fflush(stdout);
 	}
 }
 
-int main(int argc,char **argv)
+void descent_main(int argc,char **argv)
 {
 //	error_init(NULL);
 
-
-	setbuf(stdout, NULL);	// unbuffered output via printf
-
-	//nds_init ();
-  aptInit();
-
-	// 3DS Initializing code
-    //gfxInit(GSP_BGR8_OES, GSP_BGR8_OES, true);  // BGR8: 3 bytes/pixel, matches our blit code
-    gfxInitDefault();
-    osSetSpeedupEnable(true);
-    consoleInit(GFX_BOTTOM, NULL);
-    //gfxSetDoubleBuffering(GFX_BOTTOM, false);
-    romfsInit();
-
-    init_3ds_gpu();
-
-    //freopen("sdmc:/3dscent.log", "w", stdout);
-    //setbuf(stdout, NULL);
-    chdir("sdmc:/3dscent/");
-
-    // Debug: list romfs contents
-    {
-        DIR *d = opendir(".");
-        struct dirent *entry;
-        printf("romfs contents:\n");
-        if (d) {
-            while ((entry = readdir(d)) != NULL)
-                printf("  %s\n", entry->d_name);
-            closedir(d);
-        } else {
-            printf("  (failed to open)\n");
-        }
-    }
-
-    printf("Launching 3DScent...\n");
 
 	InitArgs( argc,argv );
 
@@ -1315,7 +1284,7 @@ int main(int argc,char **argv)
 #endif
 	strcpy(Menu_pcx_name, "menu.pcx");	//	Used to be menu2.pcx.
 
-	if (init_graphics()) return 1;
+	if (init_graphics()) return;
 
 	#ifdef EDITOR
 	if (!Inferno_is_800x600_available)	{
@@ -1686,8 +1655,8 @@ int main(int argc,char **argv)
 		bm_init();
 #endif
 
-	if ( FindArg( "-norun" ) )
-		return(0);
+	//if ( FindArg( "-norun" ) )
+		//return(0);
 
 	printf( (0, "\nInitializing 3d system..." ));
 	g3_init();
@@ -1786,8 +1755,6 @@ int main(int argc,char **argv)
 		}
 	}
 
-	WriteConfigFile();
-
 #ifndef ROCKWELL_CODE
 	#ifndef RELEASE
 	if (!FindArg( "-notitles" ))
@@ -1803,7 +1770,7 @@ int main(int argc,char **argv)
 //		show_mem_info = 1;		// Make memory statistics show
 	#endif
 
-	return(0);		//presumably successful exit
+  printf( "\n" );
 }
 
 
@@ -1979,3 +1946,60 @@ int find_descent_cd()
 }
 
 #endif
+
+int main(int argc, char** argv) {
+    setbuf(stdout, NULL);	// unbuffered output via printf
+
+    aptInit();
+
+    gfxInitDefault();
+    osSetSpeedupEnable(true);
+    consoleInit(GFX_BOTTOM, NULL);
+    //gfxSetDoubleBuffering(GFX_BOTTOM, false);
+    romfsInit();
+
+    init_3ds_gpu();
+
+    freopen("sdmc:/3dscent.log", "w", stdout);
+    setbuf(stdout, NULL);
+    chdir("sdmc:/3dscent/");
+
+    // Debug: list romfs contents
+    {
+        DIR *d = opendir(".");
+        struct dirent *entry;
+        printf("romfs contents:\n");
+        if (d) {
+            while ((entry = readdir(d)) != NULL)
+                printf("  %s\n", entry->d_name);
+            closedir(d);
+        } else {
+            printf("  (failed to open)\n");
+        }
+    }
+
+    printf("Launching 3DScent...\n");
+    
+    if (setjmp(exit_jmp) == 0) {
+        descent_main(argc, argv);
+    }
+    
+    printf("Writing config file...\n");
+    WriteConfigFile();
+
+    printf("Closing audio\n");
+    digi_close();        
+
+    printf("Closing ROMFS\n");
+    romfsExit();         
+
+    printf("Closing 3D GPU\n");
+    C3D_Fini();
+
+    printf("Exiting graphics mode\n");
+    gfxExit();
+
+    aptExit();          
+    return 0;
+}
+

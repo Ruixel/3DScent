@@ -818,16 +818,13 @@ void digi_kill_sound_linked_to_object( int objnum )
 	}
 }
 
-// TODO: Needs calling
-void digi_close()
+void digi_close(void)
 {
-	if (!digi_initialized)
-		return;
-	digi_stop_current_song();
-
-	digi_initialized = 0;
-
-  shutdownOggPlayer();
+  if (!digi_initialized) return;
+  digi_stop_current_song();
+  digi_initialized = 0;
+  shutdownOggPlayer();   
+  Snd_Exit();            
 }
 
 void digi_init_sounds()
