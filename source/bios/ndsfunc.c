@@ -547,7 +547,11 @@ static int              world_vbo_count;
 
 static world_batch_t world_batches[WORLD_MAX_BATCHES];
 static int           world_batch_count;
-static C3D_Tex*      world_last_tex;  // coalesces consecutive same-texture polys
+static int           world_last_slot = -1;
+
+static int  current_tex_slot = 0;  // set before any emit_vert calls
+static u16* index_buf;          // linearAlloc'd, fed to DrawElements
+static u16  vert_tex_slots[WORLD_MAX_VERTS];  // tex slot for each vert
 
 static void world_init(void)
 {
@@ -559,11 +563,15 @@ static void world_init(void)
 
     world_vbo = linearAlloc(sizeof(world_vertex) * WORLD_MAX_VERTS);
     world_vbo_count = 0;
+
+    index_buf = linearAlloc(WORLD_MAX_VERTS * sizeof(u16));
 }
 
-static inline void world_emit_vert(float x, float y, float z, float u, float v, float light, u32 color)
+static inline void world_emit_vert(float x, float y, float z,
+                                   float u, float v, float light, u32 color)
 {
     if (world_vbo_count >= WORLD_MAX_VERTS) return;
+    vert_tex_slots[world_vbo_count] = (u16)current_tex_slot;
     world_vertex* p = &world_vbo[world_vbo_count++];
     p->x = x; p->y = y; p->z = z;
     p->u = u; p->v = v;
@@ -622,21 +630,17 @@ static void world_build_projection(float iod)
     world_projection = tmp;
 }
 
+static bool world_frame_prepared = false;
+
 static void world_frame_begin(void)
 {
-    // Wait for the previous frame's GPU work to complete before we
-    // overwrite world_vbo. Without this, Descent's render walk can corrupt
-    // verts that the GPU is still reading. The race is wider in stereo
-    // because right-eye draws are submitted later. SYNCDRAW at FrameBegin
-    // doesn't cover us here because world_vbo gets written before
-    // FrameBegin runs.
     gspWaitForP3D();
 
     world_vbo_count = 0;
     world_batch_count = 0;
-    world_last_tex = NULL;
+    world_last_slot = -1;
+    world_frame_prepared = false;   // <-- add this
 
-    // Free textures orphaned in the previous frame (now safe: GPU done).
     for (int i = 0; i < orphan_slot_count; i++) {
         gpu_tex_free_slot(orphan_slots[i]);
     }
@@ -667,33 +671,82 @@ static void world_setup_state(void)
     C3D_TexEnvFunc(env, C3D_Both, GPU_MODULATE);
 }
 
-static int batch_compare(const void* a, const void* b) {
-    const world_batch_t* ba = (const world_batch_t*)a;
-    const world_batch_t* bb = (const world_batch_t*)b;
-    return (ba->tex > bb->tex) - (ba->tex < bb->tex);
-}
-
 static void world_frame_end(void)
 {
     if (world_vbo_count == 0) return;
 
+    assert(world_vbo_count % 3 == 0);
+    assert(world_vbo_count <= WORLD_MAX_VERTS);
+
     world_setup_state();
 
-    // Sort by texture, then merge consecutive runs into single draw calls.
-    qsort(world_batches, world_batch_count, sizeof(world_batch_t), batch_compare);
+    static int tex_counts[GPU_TEX_MAX];
+    static u16 active_tex[WORLD_MAX_BATCHES];
+    static int active_tex_count = 0;
 
-    int i = 0;
-    while (i < world_batch_count) {
-        if (world_batches[i].vert_count == 0) { i++; continue; }
+    if (!world_frame_prepared) {
+        int tex_offsets[GPU_TEX_MAX];
+        int tex_cursor[GPU_TEX_MAX];
+        static world_vertex sorted_vbo[WORLD_MAX_VERTS];
 
-        C3D_Tex* cur_tex = world_batches[i].tex;
-        C3D_TexBind(0, cur_tex);
+        for (int i = 0; i < active_tex_count; i++)
+            tex_counts[active_tex[i]] = 0;
+        active_tex_count = 0;
 
-        while (i < world_batch_count && world_batches[i].tex == cur_tex) {
-            if (world_batches[i].vert_count > 0)
-                C3D_DrawArrays(GPU_TRIANGLES, world_batches[i].vert_start, world_batches[i].vert_count);
-            i++;
+        const int tri_count = world_vbo_count / 3;
+
+        // Pass 1: count triangles per texture
+        for (int t = 0; t < tri_count; t++) {
+            u16 slot = vert_tex_slots[t * 3];
+            if (tex_counts[slot] == 0) {
+                assert(active_tex_count < WORLD_MAX_BATCHES);
+                active_tex[active_tex_count++] = slot;
+            }
+            tex_counts[slot] += 3;
         }
+
+        // Pass 2: offsets
+        int offset = 0;
+        for (int i = 0; i < active_tex_count; i++) {
+            u16 slot = active_tex[i];
+            tex_offsets[slot] = offset;
+            tex_cursor[slot]  = offset;
+            offset += tex_counts[slot];
+        }
+
+        // Pass 3: scatter triangles
+        for (int t = 0; t < tri_count; t++) {
+            const int src = t * 3;
+            u16 slot = vert_tex_slots[src];
+            int dst = tex_cursor[slot];
+            sorted_vbo[dst + 0] = world_vbo[src + 0];
+            sorted_vbo[dst + 1] = world_vbo[src + 1];
+            sorted_vbo[dst + 2] = world_vbo[src + 2];
+            tex_cursor[slot] = dst + 3;
+        }
+
+        memcpy(world_vbo, sorted_vbo, world_vbo_count * sizeof(world_vertex));
+        GSPGPU_FlushDataCache(world_vbo, world_vbo_count * sizeof(world_vertex));
+
+        // Rebuild world_batches[] to reflect post-sort layout
+        world_batch_count = 0;
+        world_last_slot = -1;
+        for (int i = 0; i < active_tex_count; i++) {
+            u16 slot = active_tex[i];
+            world_batch_t* batch = &world_batches[world_batch_count++];
+            batch->tex        = gpu_tex_pool[slot].tex;
+            batch->vert_start = tex_offsets[slot];
+            batch->vert_count = tex_counts[slot];
+        }
+
+        world_frame_prepared = true;
+    }
+
+    // Draw — runs every eye
+    for (int i = 0; i < world_batch_count; i++) {
+        world_batch_t* batch = &world_batches[i];
+        C3D_TexBind(0, batch->tex);
+        C3D_DrawArrays(GPU_TRIANGLES, batch->vert_start, batch->vert_count);
     }
 }
 
@@ -710,10 +763,11 @@ static bool    white_tex_ready = false;
 
 extern ubyte gr_palette[];
 
+static int white_tex_slot = -1;
+
 static void white_tex_init(void)
 {
     if (white_tex_ready) return;
-    // 8x8 minimum for the tiler.
     if (!C3D_TexInit(&white_tex, 8, 8, GPU_RGBA5551)) return;
     C3D_TexSetFilter(&white_tex, GPU_LINEAR, GPU_LINEAR);
     C3D_TexSetWrap(&white_tex, GPU_REPEAT, GPU_REPEAT);
@@ -721,6 +775,13 @@ static void white_tex_init(void)
     u16 src[64];
     for (int i = 0; i < 64; i++) src[i] = 0xFFFF;
     tex_upload_5551(&white_tex, src, 8, 8, 8);
+
+    // Claim a dynamic slot so it plays nicely with the bucket sort
+    white_tex_slot = GPU_TEX_PRELOADED_MAX;  // first dynamic slot
+    gpu_tex_pool[white_tex_slot].tex     = &white_tex;
+    gpu_tex_pool[white_tex_slot].u_scale = 1.0f;
+    gpu_tex_pool[white_tex_slot].v_scale = 1.0f;
+
     white_tex_ready = true;
 }
 
@@ -749,7 +810,7 @@ ITCM_CODE void g3_draw_poly_flat_color(int nv, vms_vector** pointlist, int color
     if (world_vbo_count + needed > WORLD_MAX_VERTS) return;
 
     world_batch_t* batch;
-    if (world_last_tex == &white_tex && world_batch_count > 0) {
+    if (world_last_slot == white_tex_slot && world_batch_count > 0) {
         batch = &world_batches[world_batch_count - 1];
     } else {
         if (world_batch_count >= WORLD_MAX_BATCHES) return;
@@ -757,10 +818,11 @@ ITCM_CODE void g3_draw_poly_flat_color(int nv, vms_vector** pointlist, int color
         batch->tex = &white_tex;
         batch->vert_start = world_vbo_count;
         batch->vert_count = 0;
-        world_last_tex = &white_tex;
+        world_last_slot = white_tex_slot;
     }
 
     // UV 0.5 just samples the middle of the all-white texture.
+    current_tex_slot = white_tex_slot;
     for (int i = 1; i < nv - 1; i++) {
         world_emit_vert(cx[0],   cy[0],   cz[0],   0.5f, 0.5f, 1.0f, color);
         world_emit_vert(cx[i],   cy[i],   cz[i],   0.5f, 0.5f, 1.0f, color);
@@ -913,7 +975,7 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
     if (world_vbo_count + needed > WORLD_MAX_VERTS) return;
 
     world_batch_t* batch;
-    if (world_last_tex == gt->tex && world_batch_count > 0) {
+    if (world_last_slot == idx && world_batch_count > 0) {
         batch = &world_batches[world_batch_count - 1];
     } else {
         if (world_batch_count >= WORLD_MAX_BATCHES) return;
@@ -921,9 +983,10 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
         batch->tex = gt->tex;
         batch->vert_start = world_vbo_count;
         batch->vert_count = 0;
-        world_last_tex = gt->tex;
+        world_last_slot = idx;
     }
 
+    current_tex_slot = idx;
     for (int i = 1; i < nv - 1; i++) {
         world_emit_vert(ix[0],   iy[0],   iz[0],   iu[0],   iv[0],   il[0],   0xFFFFFFFF);
         world_emit_vert(ix[i],   iy[i],   iz[i],   iu[i],   iv[i],   il[i],   0xFFFFFFFF);
@@ -1052,7 +1115,7 @@ static void emit_sprite_quad(grs_bitmap* bm,
     if (world_vbo_count + needed > WORLD_MAX_VERTS) return;
 
     world_batch_t* batch;
-    if (world_last_tex == gt->tex && world_batch_count > 0) {
+    if (world_last_slot == idx && world_batch_count > 0) {
         batch = &world_batches[world_batch_count - 1];
     } else {
         if (world_batch_count >= WORLD_MAX_BATCHES) return;
@@ -1060,9 +1123,10 @@ static void emit_sprite_quad(grs_bitmap* bm,
         batch->tex = gt->tex;
         batch->vert_start = world_vbo_count;
         batch->vert_count = 0;
-        world_last_tex = gt->tex;
+        world_last_slot = idx;
     }
 
+    current_tex_slot = idx;
     for (int i = 1; i < out_nv - 1; i++) {
         world_emit_vert(cx[0],   cy[0],   cz[0],   cu[0],   cv[0],   cl[0],   0xFFFFFFFF);
         world_emit_vert(cx[i],   cy[i],   cz[i],   cu[i],   cv[i],   cl[i],   0xFFFFFFFF);
@@ -1224,6 +1288,7 @@ static bool update_packed_palette(void)
 }
 
 TIMER_DECL(bitblt_ticks);
+TIMER_DECL(flush_ticks);
 TIMER_DECL(render_left_ticks);
 TIMER_DECL(render_right_ticks);
 static u8 back_buffer_prev[GAME_W * GAME_H];
@@ -1292,7 +1357,7 @@ void bitblt_to_screen(void)
     // stereo can sample stale cache lines because the right-eye draws are
     // submitted later and timing differences expose the coherency hole.
   
-    TIMER_START(t_left);
+    TIMER_START(t_flush);
     if (world_vbo_count > 0) {
         GSPGPU_FlushDataCache(world_vbo, sizeof(world_vertex) * world_vbo_count);
     }
@@ -1305,8 +1370,10 @@ void bitblt_to_screen(void)
     // overwrite during GPU read would tear the bitblt. If observed,
     // double-buffer back_tex.
     C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+    TIMER_ADD(flush_ticks, t_flush);
 
     // -------- Left eye --------
+    TIMER_START(t_left);
     C3D_RenderTargetClear(target_left, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
     C3D_FrameDrawOn(target_left);
     world_build_projection(stereo ? -iod : 0.0f);
@@ -1326,19 +1393,20 @@ void bitblt_to_screen(void)
     C3D_FrameEnd(0);
 
 #ifdef DEBUG_TIMING
-    // printf("polys=%d preload=%d hash=%d dynUp=%d compUp=%d compReuse=%d fail=%d\n",
-    //        poly_count,
-    //        frame_preloaded_hits, frame_hash_hits,
-    //        frame_dynamic_uploads,
-    //        frame_composite_uploads, frame_composite_reuses,
-    //        frame_lookup_failures);
-    printf("bitblt %.2f ms, tmap %.2f ms (lookup %.2f, convert %.2f, emit %.2f)\n",
-           TIMER_MS(bitblt_ticks),
-           TIMER_MS(tmap_ticks), TIMER_MS(t_lookup), TIMER_MS(t_convert), TIMER_MS(t_emit));
-    printf("render left %.2f ms, render right %.2f ms\n",
-           TIMER_MS(render_left_ticks), TIMER_MS(render_right_ticks));
-    printf("world_vbo_count=%d\n", world_vbo_count);
-    bitblt_ticks = 0; render_left_ticks = 0; render_right_ticks = 0;
+    static int debug_frame = 0;
+    if (++debug_frame >= 10) {
+        debug_frame = 0;
+        printf("preload hits=%d, hash hits=%d, dynamic uploads=%d, composite uploads=%d, composite reuses=%d, lookup failures=%d\n",
+               frame_preloaded_hits, frame_hash_hits, frame_dynamic_uploads,
+               frame_composite_uploads, frame_composite_reuses, frame_lookup_failures);
+        printf("bitblt %.2f ms, tmap %.2f ms (lookup %.2f, convert %.2f, emit %.2f)\n",
+               TIMER_MS(bitblt_ticks),
+               TIMER_MS(tmap_ticks), TIMER_MS(t_lookup), TIMER_MS(t_convert), TIMER_MS(t_emit));
+        printf("flush %.2f ms, render left %.2f ms, render right %.2f ms\n",
+               TIMER_MS(flush_ticks), TIMER_MS(render_left_ticks), TIMER_MS(render_right_ticks));
+        printf("world_vbo_count=%d\n", world_vbo_count);
+    }
+    bitblt_ticks = 0; render_left_ticks = 0; render_right_ticks = 0; flush_ticks = 0;
     tmap_ticks = 0; t_lookup = 0; t_convert = 0; t_emit = 0;
 #endif
 
