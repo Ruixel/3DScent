@@ -1315,9 +1315,11 @@ void sceneInit(void)
 static void draw_screen_contents(void)
 {
     C3D_DepthTest(true, GPU_GEQUAL, GPU_WRITE_ALL);
+    C3D_CullFace(GPU_CULL_FRONT_CCW);
 
     world_frame_end();
 
+    C3D_CullFace(GPU_CULL_NONE);
     C3D_BindProgram(&program);
     C3D_AttrInfo* attrInfo = C3D_GetAttrInfo();
     AttrInfo_Init(attrInfo);
