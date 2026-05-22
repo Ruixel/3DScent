@@ -100,7 +100,8 @@ bool gpu_inited = false;
 // Define DEBUG_TIMING to enable. Each TIMED_BLOCK accumulates into a u64
 // counter; PRINT_TIMING dumps and resets at frame end.
 // =============================================================================
-//#define DEBUG_TIMING
+#define DEBUG_TIMING
+//#define DEBUG_TIMING_DETAILED
 
 #ifdef DEBUG_TIMING_DETAILED
   #define DEBUG_TIMING  // auto-enable coarse timing
@@ -579,6 +580,19 @@ static inline void world_emit_vert(float x, float y, float z,
     p->color = color;
 }
 
+// Unchecked variant — caller must have already verified capacity.
+// Used in the hot paths after a single top-of-function bounds check.
+static inline void world_emit_vert_unchecked(float x, float y, float z,
+                                             float u, float v, float light, u32 color)
+{
+    vert_tex_slots[world_vbo_count] = (u16)current_tex_slot;
+    world_vertex* p = &world_vbo[world_vbo_count++];
+    p->x = x; p->y = y; p->z = z;
+    p->u = u; p->v = v;
+    p->light = light;
+    p->color = color;
+}
+
 // Build the perspective projection for one eye.
 //
 // We construct the matrix as remap * shear * persp_tilt rather than calling
@@ -833,13 +847,6 @@ ITCM_CODE void g3_draw_poly_flat_color(int nv, vms_vector** pointlist, int color
     float b = (float)gr_palette[color_idx * 3 + 2] * (1.0f / 63.0f);
     u32 color = 0xFF000000 | ((u32)(b * 255) << 16) | ((u32)(g * 255) << 8) | (u32)(r * 255);
 
-    float cx[WORLD_MAX_POLY_VERTS], cy[WORLD_MAX_POLY_VERTS], cz[WORLD_MAX_POLY_VERTS];
-    for (int i = 0; i < nv; i++) {
-        cx[i] = (float)pointlist[i]->x * (1.0f / 65536.0f);
-        cy[i] = (float)pointlist[i]->y * (1.0f / 65536.0f);
-        cz[i] = (float)pointlist[i]->z * (1.0f / 65536.0f);
-    }
-
     int needed = (nv - 2) * 3;
     if (world_vbo_count + needed > WORLD_MAX_VERTS) return;
 
@@ -855,12 +862,29 @@ ITCM_CODE void g3_draw_poly_flat_color(int nv, vms_vector** pointlist, int color
         world_last_slot = white_tex_slot;
     }
 
-    // UV 0.5 just samples the middle of the all-white texture.
     current_tex_slot = white_tex_slot;
+
+    const float inv_fix = 1.0f / 65536.0f;
+
+    const float v0x = (float)pointlist[0]->x * inv_fix;
+    const float v0y = (float)pointlist[0]->y * inv_fix;
+    const float v0z = (float)pointlist[0]->z * inv_fix;
+
+    float prev_x = (float)pointlist[1]->x * inv_fix;
+    float prev_y = (float)pointlist[1]->y * inv_fix;
+    float prev_z = (float)pointlist[1]->z * inv_fix;
+
     for (int i = 1; i < nv - 1; i++) {
-        world_emit_vert(cx[0],   cy[0],   cz[0],   0.5f, 0.5f, 1.0f, color);
-        world_emit_vert(cx[i],   cy[i],   cz[i],   0.5f, 0.5f, 1.0f, color);
-        world_emit_vert(cx[i+1], cy[i+1], cz[i+1], 0.5f, 0.5f, 1.0f, color);
+        const int j = i + 1;
+        float nx = (float)pointlist[j]->x * inv_fix;
+        float ny = (float)pointlist[j]->y * inv_fix;
+        float nz = (float)pointlist[j]->z * inv_fix;
+
+        world_emit_vert_unchecked(v0x,    v0y,    v0z,    0.5f, 0.5f, 1.0f, color);
+        world_emit_vert_unchecked(prev_x, prev_y, prev_z, 0.5f, 0.5f, 1.0f, color);
+        world_emit_vert_unchecked(nx,     ny,     nz,     0.5f, 0.5f, 1.0f, color);
+
+        prev_x = nx; prev_y = ny; prev_z = nz;
     }
     batch->vert_count += needed;
 }
@@ -985,26 +1009,6 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
     TIMER_ADD_D(t_lookup, t_phase);
     TIMER_RESET_D(t_phase);
 
-    // Camera-space fixed -> float. The GPU vertex shader handles the
-    // perspective divide, giving us perspective-correct UVs for free.
-    float ix[WORLD_MAX_POLY_VERTS], iy[WORLD_MAX_POLY_VERTS], iz[WORLD_MAX_POLY_VERTS];
-    float iu[WORLD_MAX_POLY_VERTS], iv[WORLD_MAX_POLY_VERTS];
-    float il[WORLD_MAX_POLY_VERTS];
-
-    for (int i = 0; i < nv; i++) {
-        ix[i] = (float)pointlist[i]->x * (1.0f / 65536.0f);
-        iy[i] = (float)pointlist[i]->y * (1.0f / 65536.0f);
-        iz[i] = (float)pointlist[i]->z * (1.0f / 65536.0f);
-        iu[i] = (float)uvl_list[i].u * (1.0f / 65536.0f) * gt->u_scale;
-        iv[i] = gt->v_scale - (float)uvl_list[i].v * (1.0f / 65536.0f) * gt->v_scale;
-        il[i] = (float)uvl_list[i].l * (1.0f / 65536.0f);
-        if (il[i] < 0.0f) il[i] = 0.0f;
-        if (il[i] > 1.0f) il[i] = 1.0f;
-    }
-
-    TIMER_ADD_D(t_convert, t_phase);
-    TIMER_RESET_D(t_phase);
-
     int needed = (nv - 2) * 3;
     if (world_vbo_count + needed > WORLD_MAX_VERTS) return;
 
@@ -1021,10 +1025,48 @@ ITCM_CODE void g3_draw_tmap_tex(int nv, vms_vector** pointlist,
     }
 
     current_tex_slot = idx;
+
+    const float inv_fix = 1.0f / 65536.0f;
+    const float u_scale = gt->u_scale;
+    const float v_scale = gt->v_scale;
+
+    // Vertex 0 is shared across every triangle of the fan — compute once.
+    const float v0x = (float)pointlist[0]->x * inv_fix;
+    const float v0y = (float)pointlist[0]->y * inv_fix;
+    const float v0z = (float)pointlist[0]->z * inv_fix;
+    const float v0u = (float)uvl_list[0].u * inv_fix * u_scale;
+    const float v0v = v_scale - (float)uvl_list[0].v * inv_fix * v_scale;
+    float v0l = (float)uvl_list[0].l * inv_fix;
+    if (v0l < 0.0f) v0l = 0.0f;
+    else if (v0l > 1.0f) v0l = 1.0f;
+
+    // Vertex i+1 of one triangle is vertex i of the next — cache across iterations.
+    float prev_x = (float)pointlist[1]->x * inv_fix;
+    float prev_y = (float)pointlist[1]->y * inv_fix;
+    float prev_z = (float)pointlist[1]->z * inv_fix;
+    float prev_u = (float)uvl_list[1].u * inv_fix * u_scale;
+    float prev_v = v_scale - (float)uvl_list[1].v * inv_fix * v_scale;
+    float prev_l = (float)uvl_list[1].l * inv_fix;
+    if (prev_l < 0.0f) prev_l = 0.0f;
+    else if (prev_l > 1.0f) prev_l = 1.0f;
+
     for (int i = 1; i < nv - 1; i++) {
-        world_emit_vert(ix[0],   iy[0],   iz[0],   iu[0],   iv[0],   il[0],   0xFFFFFFFF);
-        world_emit_vert(ix[i],   iy[i],   iz[i],   iu[i],   iv[i],   il[i],   0xFFFFFFFF);
-        world_emit_vert(ix[i+1], iy[i+1], iz[i+1], iu[i+1], iv[i+1], il[i+1], 0xFFFFFFFF);
+        const int j = i + 1;
+        float nx = (float)pointlist[j]->x * inv_fix;
+        float ny = (float)pointlist[j]->y * inv_fix;
+        float nz = (float)pointlist[j]->z * inv_fix;
+        float nu = (float)uvl_list[j].u * inv_fix * u_scale;
+        float nv_ = v_scale - (float)uvl_list[j].v * inv_fix * v_scale;
+        float nl = (float)uvl_list[j].l * inv_fix;
+        if (nl < 0.0f) nl = 0.0f;
+        else if (nl > 1.0f) nl = 1.0f;
+
+        world_emit_vert_unchecked(v0x,    v0y,    v0z,    v0u,    v0v,    v0l,    0xFFFFFFFF);
+        world_emit_vert_unchecked(prev_x, prev_y, prev_z, prev_u, prev_v, prev_l, 0xFFFFFFFF);
+        world_emit_vert_unchecked(nx,     ny,     nz,     nu,     nv_,    nl,     0xFFFFFFFF);
+
+        prev_x = nx; prev_y = ny; prev_z = nz;
+        prev_u = nu; prev_v = nv_; prev_l = nl;
     }
     batch->vert_count += needed;
 
@@ -1162,9 +1204,9 @@ static void emit_sprite_quad(grs_bitmap* bm,
 
     current_tex_slot = idx;
     for (int i = 1; i < out_nv - 1; i++) {
-        world_emit_vert(cx[0],   cy[0],   cz[0],   cu[0],   cv[0],   cl[0],   0xFFFFFFFF);
-        world_emit_vert(cx[i],   cy[i],   cz[i],   cu[i],   cv[i],   cl[i],   0xFFFFFFFF);
-        world_emit_vert(cx[i+1], cy[i+1], cz[i+1], cu[i+1], cv[i+1], cl[i+1], 0xFFFFFFFF);
+        world_emit_vert_unchecked(cx[0],   cy[0],   cz[0],   cu[0],   cv[0],   cl[0],   0xFFFFFFFF);
+        world_emit_vert_unchecked(cx[i],   cy[i],   cz[i],   cu[i],   cv[i],   cl[i],   0xFFFFFFFF);
+        world_emit_vert_unchecked(cx[i+1], cy[i+1], cz[i+1], cu[i+1], cv[i+1], cl[i+1], 0xFFFFFFFF);
     }
     batch->vert_count += needed;
 }
