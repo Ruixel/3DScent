@@ -747,6 +747,10 @@ void draw_model_picture(int mn,vms_angvec *orient_angles)
 	else
 		temp_pos.z = DEFAULT_VIEW_DIST;
 
+  temp_pos.z += 3000000;
+  temp_pos.x += 300000;
+  temp_pos.y -= 50000;
+
 	vm_angles_2_matrix(&temp_orient, orient_angles);
 
 	//save_light = Lighting_on;
