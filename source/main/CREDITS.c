@@ -286,7 +286,7 @@ void credits_show()
 #ifdef SHAREWARE
 	songs_play_song( SONG_CREDITS, 1 );			// shareware song is too short!!!
 #else
-	songs_play_song( SONG_CREDITS, 0 );			// registered song is just right!!!
+	songs_play_song( SONG_CREDITS, 1 );			// registered song is just right!!!
 #endif
 
 	gr_remap_bitmap_good( &backdrop,backdrop_palette, -1, -1 );
@@ -306,7 +306,7 @@ void credits_show()
 	key_flush();
 	last_time = timer_get_fixed_seconds();
 	done = 0;
-	first_line_offset = 0;
+	first_line_offset = -150;
 	while( 1 )	{
 		int k;
 
