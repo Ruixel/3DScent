@@ -545,6 +545,9 @@ static C3D_Mtx          world_projection;
 static world_vertex*    world_vbo;
 static int              world_vbo_count;
 
+static world_vertex* world_vbo_buffers[2];
+static int world_vbo_current = 0;
+
 static world_batch_t world_batches[WORLD_MAX_BATCHES];
 static int           world_batch_count;
 static int           world_last_slot = -1;
@@ -563,7 +566,9 @@ static void world_init(void)
 
     world_uLoc_projection = shaderInstanceGetUniformLocation(world_program.vertexShader, "projection");
 
-    world_vbo = linearAlloc(sizeof(world_vertex) * WORLD_MAX_VERTS);
+    world_vbo_buffers[0] = linearAlloc(sizeof(world_vertex) * WORLD_MAX_VERTS);
+    world_vbo_buffers[1] = linearAlloc(sizeof(world_vertex) * WORLD_MAX_VERTS);
+world_vbo = world_vbo_buffers[0];
     world_vbo_count = 0;
 
     index_buf = linearAlloc(WORLD_MAX_VERTS * sizeof(u16));
@@ -666,13 +671,15 @@ TIMER_DECL(p3d_wait_time);
 static void world_frame_begin(void)
 {
     TIMER_START(p3d_t);
-    gspWaitForP3D();
+    //gspWaitForP3D();
     TIMER_ADD(p3d_wait_time, p3d_t);
 
     world_vbo_count = 0;
     world_batch_count = 0;
     world_last_slot = -1;
     world_frame_prepared = false;   // <-- add this
+world_vbo_current ^= 1;
+world_vbo = world_vbo_buffers[world_vbo_current];
 
     for (int i = 0; i < orphan_slot_count; i++) {
         gpu_tex_free_slot(orphan_slots[i]);
@@ -1503,9 +1510,20 @@ static u8 back_buffer_prev[GAME_W * GAME_H];
 
 extern bool exit_requested;
 extern jmp_buf exit_jmp;
+static u64 next_frame_tick = 0;
 
 void bitblt_to_screen(void)
 {
+    u64 now = svcGetSystemTick();
+    if (next_frame_tick == 0) next_frame_tick = now;
+    if (now < next_frame_tick) {
+        s64 ns = ((next_frame_tick - now) * 1000000000LL) / SYSCLOCK_ARM11;
+        svcSleepThread(ns);
+    }
+    next_frame_tick += SYSCLOCK_ARM11 / 60;
+    u64 now2 = svcGetSystemTick();
+    if (next_frame_tick < now2) next_frame_tick = now2;  // don't try to catch up
+  
     if (!aptMainLoop() && !exit_requested) {
         exit_requested = true;
         longjmp(exit_jmp, 1);  // unwinds the stack back to setjmp
@@ -1581,7 +1599,7 @@ void bitblt_to_screen(void)
     // Outstanding risk: back_tex is re-uploaded every frame, so a CPU
     // overwrite during GPU read would tear the bitblt. If observed,
     // double-buffer back_tex.
-    C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+    C3D_FrameBegin(0);
     TIMER_ADD(flush_ticks, t_flush);
 
     // -------- Left eye --------
