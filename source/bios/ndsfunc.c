@@ -1260,10 +1260,119 @@ ITCM_CODE void g3_draw_bitmap(vms_vector* pos, fix width, fix height, grs_bitmap
 }
 
 // =============================================================================
-// Bitblt path — palette framebuffer to screen
+// Palette flash overlay
 // =============================================================================
+// Descent uses PaletteRedAdd/GreenAdd/BlueAdd to flash the screen (red on
+// damage, blue on shield pickup, etc). On DOS this was done by modifying
+// the palette. Our world textures were uploaded with the original palette,
+// so we draw a translucent colored overlay on top of the 3D world instead.
+// Drawn after world_frame_end but before the HUD bitblt, so the HUD is
+// unaffected (matches DOS behavior — HUD was rendered via its own palette).
+// =============================================================================
+
 typedef struct { float x, y, z; float u, v; } tex_vertex;
 
+extern int PaletteRedAdd, PaletteGreenAdd, PaletteBlueAdd;
+
+// Fullscreen quad in screen space covering just the world viewport.
+// Uses the same vertex format as the bitblt quad so we can reuse its
+// buffer / shader pipeline.
+static const tex_vertex flash_quad_list[] = {
+    { 0,        SCREEN_H, 0.5f, 0.0f, 0.0f },
+    { SCREEN_W, SCREEN_H, 0.5f, 0.0f, 0.0f },
+    { SCREEN_W, 0,        0.5f, 0.0f, 0.0f },
+    { 0,        SCREEN_H, 0.5f, 0.0f, 0.0f },
+    { SCREEN_W, 0,        0.5f, 0.0f, 0.0f },
+    { 0,        0,        0.5f, 0.0f, 0.0f },
+};
+#define flash_quad_count 6
+
+static void* flash_vbo_data = NULL;
+
+static void flash_overlay_init(void)
+{
+    if (flash_vbo_data) return;
+    flash_vbo_data = linearAlloc(sizeof(flash_quad_list));
+    memcpy(flash_vbo_data, flash_quad_list, sizeof(flash_quad_list));
+}
+
+static void draw_palette_flash_overlay(void)
+{
+    int r = PaletteRedAdd, g = PaletteGreenAdd, b = PaletteBlueAdd;
+    if (r == 0 && g == 0 && b == 0) return;
+    if (!flash_vbo_data) flash_overlay_init();
+
+    C3D_BindProgram(&program);
+
+    C3D_AttrInfo* attrInfo = C3D_GetAttrInfo();
+    AttrInfo_Init(attrInfo);
+    AttrInfo_AddLoader(attrInfo, 0, GPU_FLOAT, 3);
+    AttrInfo_AddLoader(attrInfo, 1, GPU_FLOAT, 2);
+
+    C3D_BufInfo* bufInfo = C3D_GetBufInfo();
+    BufInfo_Init(bufInfo);
+    BufInfo_Add(bufInfo, flash_vbo_data, sizeof(tex_vertex), 2, 0x10);
+
+    C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLoc_projection, &projection);
+    C3D_DepthTest(false, GPU_ALWAYS, GPU_WRITE_COLOR);
+
+    C3D_TexEnv* env = C3D_GetTexEnv(0);
+    C3D_TexEnvInit(env);
+    C3D_TexEnvSrc(env, C3D_Both, GPU_CONSTANT, 0, 0);
+    C3D_TexEnvFunc(env, C3D_Both, GPU_REPLACE);
+
+    bool all_negative = (r <= 0 && g <= 0 && b <= 0) && (r < 0 || g < 0 || b < 0);
+
+    if (all_negative) {
+      // Cloak effect
+      const float min_factor = 0.15f;
+      int dim = -r;
+      if (-g > dim) dim = -g;
+      if (-b > dim) dim = -b;
+      if (dim > MAX_PALETTE_ADD) dim = MAX_PALETTE_ADD;
+      float factor = 1.0f - (1.0f - min_factor) * ((float)dim / MAX_PALETTE_ADD);
+      if (factor < 0.0f) factor = 0.0f;
+      u8 c = (u8)(factor * 255);
+      u32 color = 0xFF000000 | ((u32)c << 16) | ((u32)c << 8) | (u32)c;
+      C3D_TexEnvColor(env, color);
+      C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD,
+                     GPU_DST_COLOR, GPU_ZERO,
+                     GPU_DST_COLOR, GPU_ZERO);
+      C3D_DrawArrays(GPU_TRIANGLES, 0, flash_quad_count);
+    } else {
+      int eff_r = (r > 0) ? r : 0;
+      int eff_g = (g > 0) ? g : 0;
+      int eff_b = (b > 0) ? b : 0;
+      
+      if (r < 0) { eff_g += (-r) / 4; eff_b += (-r) / 4; }
+      if (g < 0) { eff_r += (-g) / 4; eff_b += (-g) / 4; }
+      if (b < 0) { eff_r += (-b) / 4; eff_g += (-b) / 4; }
+
+      const float intensity = 0.5f;
+      u8 cr = (u8)((eff_r * 255 * intensity) / MAX_PALETTE_ADD);
+      u8 cg = (u8)((eff_g * 255 * intensity) / MAX_PALETTE_ADD);
+      u8 cb = (u8)((eff_b * 255 * intensity) / MAX_PALETTE_ADD);
+      if (cr > 255) cr = 255;
+      if (cg > 255) cg = 255;
+      if (cb > 255) cb = 255;
+      
+      u32 color = 0xFF000000 | ((u32)cb << 16) | ((u32)cg << 8) | (u32)cr;
+      C3D_TexEnvColor(env, color);
+      C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD,
+                     GPU_ONE, GPU_ONE,
+                     GPU_ONE, GPU_ONE);
+      C3D_DrawArrays(GPU_TRIANGLES, 0, flash_quad_count);
+    }
+
+    // Restore standard blend
+    C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD,
+                   GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA,
+                   GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA);
+}
+
+// =============================================================================
+// Bitblt path — palette framebuffer to screen
+// =============================================================================
 static const tex_vertex quad_list[] = {
     { QUAD_X0, QUAD_Y1, 0.5f, 0.0f,       QUAD_TEX_V },
     { QUAD_X1, QUAD_Y1, 0.5f, QUAD_TEX_U, QUAD_TEX_V },
@@ -1337,6 +1446,11 @@ static void draw_screen_contents(void)
     world_frame_end();
 
     C3D_CullFace(GPU_CULL_NONE);
+    C3D_DepthTest(false, GPU_ALWAYS, GPU_WRITE_COLOR);
+    //C3D_AlphaTest(false, GPU_ALWAYS, 0);
+    draw_palette_flash_overlay();
+    //C3D_AlphaTest(true, GPU_GREATER, 0);
+
     C3D_BindProgram(&program);
     C3D_AttrInfo* attrInfo = C3D_GetAttrInfo();
     AttrInfo_Init(attrInfo);
@@ -1354,7 +1468,6 @@ static void draw_screen_contents(void)
 
     // Bitblt is the 2D UI layer drawn first. Disable depth writes so it
     // doesn't occlude world geometry drawn after it.
-    C3D_DepthTest(false, GPU_ALWAYS, GPU_WRITE_COLOR);
     C3D_DrawArrays(GPU_TRIANGLES, 0, quad_list_count);
 }
 
