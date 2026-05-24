@@ -416,6 +416,8 @@ int read_player_file()
 	sprintf(filename,"%s.plr",Players[Player_num].callsign);
 	file = fopen(filename,"rb");
 
+  printf("Trying to open player file %s\n", filename);
+
 #if 0
 	//check filename
 	if (file && isatty(fileno(file))) {
@@ -487,6 +489,8 @@ int read_player_file()
 		}
 	}
 
+  printf("Player file version: %d\n", info.saved_game_version);
+
 	//read taunt macros
 	{
 		int i,len;
@@ -503,14 +507,16 @@ int read_player_file()
 				{errno_ret = errno; break;}
 		#else
 		i = 0;
-		fseek( file, 48*len, SEEK_CUR );
+		fseek( file, 4*len, SEEK_CUR );
 		#endif
 	}
 
 	//read kconfig data
 	{
-		if (fread( kconfig_settings, MAX_CONTROLS*CONTROL_MAX_TYPES, 1, file )!=1)
+		if (fread( kconfig_settings, MAX_CONTROLS*CONTROL_MAX_TYPES, 1, file )!=1) {
+      printf("Error reading player file kconfig data\n");
 			errno_ret=errno;
+    }
 		else if (fread(&Config_control_type, sizeof(ubyte), 1, file )!=1)
 			errno_ret=errno;
 		else if (fread(&Config_joystick_sensitivity, sizeof(ubyte), 1, file )!=1)
@@ -668,6 +674,8 @@ char filename[64];
 	sprintf(filename,"%s.plr",Players[Player_num].callsign);
 	file = fopen(filename,"wb");
 
+  printf("Trying to write player file %s\n", filename);
+
 #if 0
 	//check filename
 	if (file && isatty(fileno(file))) {
@@ -690,7 +698,6 @@ char filename[64];
 		fclose(file);
 		return errno_ret;
 	}
-
 	//write higest level info
 	if ((fwrite(highest_levels, sizeof(hli), n_highest_levels, file) != n_highest_levels)) {
 		errno_ret = errno;
@@ -714,10 +721,14 @@ char filename[64];
 	fseek( file, MAX_MESSAGE_LEN * 4, SEEK_CUR );
 	#endif
 
+  printf("Player file version: %d\n", info.saved_game_version);
+
 	//write kconfig info
 	{
-		if (fwrite( kconfig_settings, MAX_CONTROLS*CONTROL_MAX_TYPES, 1, file )!=1)
+		if (fwrite( kconfig_settings, MAX_CONTROLS*CONTROL_MAX_TYPES, 1, file )!=1) {
+      printf("Error writing player file kconfig data\n");
 			errno_ret=errno;
+    }
 		else if (fwrite( &Config_control_type, sizeof(ubyte), 1, file )!=1)
 			errno_ret=errno;
 		else if (fwrite( &Config_joystick_sensitivity, sizeof(ubyte), 1, file )!=1)
@@ -739,6 +750,8 @@ char filename[64];
 		remove(filename);			//delete bogus file
 		nm_messagebox(TXT_ERROR, 1, TXT_OK, "%s\n\n%s",TXT_ERROR_WRITING_PLR, strerror(errno_ret));
 	}
+
+  printf("Player file written, error code: %d\n", errno_ret);
 
 	return errno_ret;
 }
