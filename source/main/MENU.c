@@ -195,8 +195,6 @@ void create_main_menu(newmenu_item *m, int *menu_choice, int *callers_num_option
 
   	ADD_ITEM(TXT_LOAD_GAME,MENU_LOAD_GAME,KEY_L);
 
-	ADD_ITEM(TXT_MULTIPLAYER_,MENU_MULTIPLAYER,-1);
-
 	ADD_ITEM(TXT_OPTIONS_, MENU_CONFIG, -1 );
 	ADD_ITEM(TXT_CHANGE_PILOTS,MENU_NEW_PLAYER,unused);
 	ADD_ITEM(TXT_VIEW_DEMO,MENU_DEMO_PLAY,0);
