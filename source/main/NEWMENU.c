@@ -2133,7 +2133,7 @@ ReadFileNames:
 			save_screen_shot(0);
 			break;
 
-		case KEY_CTRLED+KEY_D:
+		case KEY_X:
 			if ( ((player_mode)&&(citem>0)) || ((demo_mode)&&(citem>=0)) )	{
 				int x = 1;
 				if (player_mode)
