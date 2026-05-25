@@ -342,8 +342,8 @@ int new_player_config()
 //		m[i].type = NM_TYPE_MENU; m[i].text = CONTROL_TEXT(i);
 //	}
 
-	m[0].type = NM_TYPE_MENU; m[0].text = "DS Pad Only";
-	m[1].type = NM_TYPE_MENU; m[1].text = "Touchscreen";
+	m[0].type = NM_TYPE_MENU; m[0].text = "Default";
+	m[1].type = NM_TYPE_MENU; m[1].text = "PSX Layout";
 //	m[2].type = NM_TYPE_MENU; m[2].text = CONTROL_TEXT(3);
 //	m[3].type = NM_TYPE_MENU; m[3].text = CONTROL_TEXT(4);
 //	m[4].type = NM_TYPE_MENU; m[4].text = CONTROL_TEXT(5);
@@ -358,12 +358,19 @@ int new_player_config()
 	if (control_choice == 0)
 		Config_control_type = CONTROL_NONE;
 	else if (control_choice == 1)
-		Config_control_type = CONTROL_MOUSE;
+		Config_control_type = CONTROL_NONE;
 
-	for (i=0;i<CONTROL_MAX_TYPES; i++ )
-		for (j=0;j<MAX_CONTROLS; j++ )
-			kconfig_settings[i][j] = default_kconfig_settings[i][j];
+	// for (i=0;i<CONTROL_MAX_TYPES; i++ )
+	// 	for (j=0;j<MAX_CONTROLS; j++ )
+	// 		kconfig_settings[i][j] = default_kconfig_settings[i][j];
+
+  for (j = 0; j < MAX_CONTROLS; j++)
+    kconfig_settings[0][j] = default_kconfig_settings[control_choice][j];
+
 	kc_set_controls();
+
+
+
 
 //	Config_control_type = control_choice;
 
