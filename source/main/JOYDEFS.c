@@ -674,7 +674,7 @@ void joydefs_config()
 			}
 			break;
 		case 3:
-			kconfig(0, "DS Pad"); 
+			kconfig(0, "3DS Controls"); 
 			break;
 		} 
 	} while(i1>-1);

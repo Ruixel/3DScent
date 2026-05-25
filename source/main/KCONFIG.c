@@ -465,7 +465,7 @@ typedef struct kc_item {
 	ubyte value;		// what key,button,etc
 } kc_item;
 
-int Num_items=23;
+int Num_items=27;
 kc_item *All_items;
 
 ubyte kconfig_settings[CONTROL_MAX_TYPES][MAX_CONTROLS];
@@ -486,52 +486,60 @@ ubyte default_kconfig_settings[CONTROL_MAX_TYPES][MAX_CONTROLS] = {
 };
 
 kc_item kc_keyboard[NUM_KEY_CONTROLS] = {
-	{  0, 15, 49, 71, 26, 42,  2, 42, 24,378,   0, 255 },
-	{  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
-	{  2, 15, 57, 71, 26,  0,  4, 24, 26,379,   0, 255 },
-	{  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
-	{  4, 15, 65, 71, 26,  2,  6, 26, 28,380,   0, 255 },
-	{  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
-	{  6, 15, 73, 71, 26,  4,  8, 28, 34,381,   0, 255 },
-	{  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
-	{  8, 15, 85, 71, 26,  6, 10, 34, 36,382,   0, 255 },
-	{  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
-	{ 10, 15, 93, 71, 26,  8, 12, 36, 44,383,   0, 255 },
-	{  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
-	{ 12, 15,101, 71, 26, 10, 14, 44, 30,384,   0, 255 },
-	{  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
-	{ 14, 15,109, 71, 26, 12, 16, 30, 32,385,   0, 255 },
-	{  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
-	{ 16, 15,117, 71, 26, 14, 18, 32, 38,386,   0, 255 },
-	{  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
-	{ 18, 15,129, 71, 26, 16, 20, 38, 40,387,   0, 255 },
-	{  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
-	{ 20, 15,137, 71, 26, 18, 22, 40, 42,388,   0, 255 },
-	{  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
-	{ 22, 15,145, 71, 26, 20, 24, 42,  0,389,   0, 255 },
-	{  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
-	{ 24,118, 49, 83, 26, 22, 26,  0,  2,390,   0, 255 },
-	{  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
-	{ 26,118, 57, 83, 26, 24, 28,  2,  4,391,   0, 255 },
-	{  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
-	{ 28,118, 65, 83, 26, 26, 34,  4,  6,392,   0, 255 },
-	{  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
-	{ 30,118,105, 83, 26, 44, 32, 12, 14,393,   0, 255 },
-	{  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
-	{ 32,118,113, 83, 26, 30, 38, 14, 16,394,   0, 255 },
-	{  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
-	{ 34,118, 73, 83, 26, 28, 36,  6,  8,395,   0, 255 },
-	{  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
-	{ 36,118, 85, 83, 26, 34, 44,  8, 10,311,   0, 255 },
-	{  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
-	{ 38,118,125, 83, 26, 32, 40, 16, 18,396,   0, 255 },
-	{  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
-	{ 40,118,133, 83, 26, 38, 42, 18, 20,397,   0, 255 },
-	{  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
-	{ 42,118,141, 83, 26, 40,  0, 20, 22,398,   0, 255 },
-	{  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
-	{ 44,118, 93, 83, 26, 36, 30, 10, 12,374,   0, 255 },
-	{  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    {  0, 15, 49, 71, 26, 52,  2, 52, 24,378,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    {  2, 15, 57, 71, 26,  0,  4, 24, 26,379,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    {  4, 15, 65, 71, 26,  2,  6, 26, 28,380,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    {  6, 15, 73, 71, 26,  4,  8, 28, 34,381,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    {  8, 15, 85, 71, 26,  6, 10, 34, 36,382,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    { 10, 15, 93, 71, 26,  8, 12, 36, 44,383,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    { 12, 15,101, 71, 26, 10, 14, 44, 30,384,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    { 14, 15,109, 71, 26, 12, 16, 30, 32,385,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    { 16, 15,117, 71, 26, 14, 18, 32, 38,386,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    { 18, 15,129, 71, 26, 16, 20, 38, 40,387,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    { 20, 15,137, 71, 26, 18, 22, 40, 42,388,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    { 22, 15,145, 71, 26, 20, 46, 42, 46,389,   0, 255 }, 
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    { 24,118, 49, 83, 26, 42, 26,  0,  2,390,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    { 26,118, 57, 83, 26, 24, 28,  2,  4,391,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    { 28,118, 65, 83, 26, 26, 34,  4,  6,392,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    { 30,118,105, 83, 26, 44, 32, 12, 14,393,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    { 32,118,113, 83, 26, 30, 38, 14, 16,394,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    { 34,118, 73, 83, 26, 28, 36,  6,  8,395,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    { 36,118, 85, 83, 26, 34, 44,  8, 10,311,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    { 38,118,125, 83, 26, 32, 40, 16, 18,396,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    { 40,118,133, 83, 26, 38, 42, 18, 20,397,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    { 42,118,141, 83, 26, 40, 24, 20, 22,398,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    { 44,118, 93, 83, 26, 36, 30, 10, 12,374,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    { 46, 15,157, 71, 26, 22, 48, 42, 48,621,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    { 48, 15,165, 71, 26, 46, 50, 46, 50,622,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    { 50, 15,173, 71, 26, 48, 52, 48, 52,623,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 },
+    { 52, 15,181, 71, 26, 50,  0, 50,  0,624,   0, 255 },
+    {  0,  0,  0,  0,  0, 42,  0, 22,  0,  0,   6, 255 }, 
 };
 /*
 kc_item kc_joystick[NUM_OTHER_CONTROLS] = {
@@ -744,6 +752,24 @@ fix get_pad_axis_value(int keycode, circlePosition *pos, circlePosition *cpos) {
     int curved = (remapped + (remapped * remapped) / range) / 2;
 
     return curved * sensitivity;
+}
+
+extern void select_weapon(int weapon_num, int secondary_flag, int print_message, int wait_for_rearm);
+
+static void cycle_weapon(int secondary_flag, int direction)
+{
+    int current   = secondary_flag ? Secondary_weapon : Primary_weapon;
+    int max_count = secondary_flag ? MAX_SECONDARY_WEAPONS : MAX_PRIMARY_WEAPONS;
+    ubyte flags   = secondary_flag ? Players[Player_num].secondary_weapon_flags
+                                   : Players[Player_num].primary_weapon_flags;
+
+    for (int i = 1; i <= max_count; i++) {
+        int candidate = ((current + direction * i) % max_count + max_count) % max_count;
+        if (flags & (1 << candidate)) {
+            select_weapon(candidate, secondary_flag, 1, 1);
+            return;
+        }
+    }
 }
 
 void kc_drawitem( kc_item *item, int is_current )
@@ -1558,7 +1584,7 @@ void kconfig_sub(kc_item * items,int nitems, char * title)
 				start_time();
 			return;
 #ifdef TABLE_CREATION
-		case KEY_F12:	{
+		case KEY_X:	{
 			FILE * fp;
 			for (i=0; i<NUM_KEY_CONTROLS; i++ )	{
 				kc_keyboard[i].u = find_next_item_up( kc_keyboard,NUM_KEY_CONTROLS, i);
@@ -1566,12 +1592,12 @@ void kconfig_sub(kc_item * items,int nitems, char * title)
 				kc_keyboard[i].l = find_next_item_left( kc_keyboard,NUM_KEY_CONTROLS, i);
 				kc_keyboard[i].r = find_next_item_right( kc_keyboard,NUM_KEY_CONTROLS, i);
 			}
-			for (i=0; i<NUM_OTHER_CONTROLS; i++ )	{
-				kc_joystick[i].u = find_next_item_up( kc_joystick,NUM_OTHER_CONTROLS, i);
-				kc_joystick[i].d = find_next_item_down( kc_joystick,NUM_OTHER_CONTROLS, i);
-				kc_joystick[i].l = find_next_item_left( kc_joystick,NUM_OTHER_CONTROLS, i);
-				kc_joystick[i].r = find_next_item_right( kc_joystick,NUM_OTHER_CONTROLS, i);
-			}
+			// for (i=0; i<NUM_OTHER_CONTROLS; i++ )	{
+			// 	kc_joystick[i].u = find_next_item_up( kc_joystick,NUM_OTHER_CONTROLS, i);
+			// 	kc_joystick[i].d = find_next_item_down( kc_joystick,NUM_OTHER_CONTROLS, i);
+			// 	kc_joystick[i].l = find_next_item_left( kc_joystick,NUM_OTHER_CONTROLS, i);
+			// 	kc_joystick[i].r = find_next_item_right( kc_joystick,NUM_OTHER_CONTROLS, i);
+			// }
 			for (i=0; i<NUM_OTHER_CONTROLS; i++ )	{
 				kc_mouse[i].u = find_next_item_up( kc_mouse,NUM_OTHER_CONTROLS, i);
 				kc_mouse[i].d = find_next_item_down( kc_mouse,NUM_OTHER_CONTROLS, i);
@@ -1600,12 +1626,12 @@ void kconfig_sub(kc_item * items,int nitems, char * title)
 			fprintf( fp, "};" );
 
 			fprintf( fp, "\nkc_item kc_joystick[NUM_OTHER_CONTROLS] = {\n" );
-			for (i=0; i<NUM_OTHER_CONTROLS; i++ )	{
-				fprintf( fp, "\t{ %2d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d, %3d, 255 },\n", 
-					kc_joystick[i].id, kc_joystick[i].x, kc_joystick[i].y, kc_joystick[i].w1, kc_joystick[i].w2,
-					kc_joystick[i].u, kc_joystick[i].d, kc_joystick[i].l, kc_joystick[i].r,
-					kc_joystick[i].text_num1, kc_joystick[i].type );
-			}
+			// for (i=0; i<NUM_OTHER_CONTROLS; i++ )	{
+			// 	fprintf( fp, "\t{ %2d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d,%3d, %3d, 255 },\n", 
+			// 		kc_joystick[i].id, kc_joystick[i].x, kc_joystick[i].y, kc_joystick[i].w1, kc_joystick[i].w2,
+			// 		kc_joystick[i].u, kc_joystick[i].d, kc_joystick[i].l, kc_joystick[i].r,
+			// 		kc_joystick[i].text_num1, kc_joystick[i].type );
+			// }
 			fprintf( fp, "};" );
 
 			fprintf( fp, "\nkc_item kc_mouse[NUM_OTHER_CONTROLS] = {\n" );
@@ -2054,6 +2080,16 @@ void controls_read_all()
 	} else {
 		Controls.pitch_time = 0;
 	}
+
+//----------- Weapon cycling
+if (kc_keyboard[46].value < 255 && key_down_count(kc_keyboard[46].value))
+    cycle_weapon(0, +1);
+if (kc_keyboard[48].value < 255 && key_down_count(kc_keyboard[48].value))
+    cycle_weapon(0, -1);
+if (kc_keyboard[50].value < 255 && key_down_count(kc_keyboard[50].value))
+    cycle_weapon(1, +1);
+if (kc_keyboard[52].value < 255 && key_down_count(kc_keyboard[52].value))
+    cycle_weapon(1, -1);
 
 //----------- Read vertical_thrust_time -----------------
 

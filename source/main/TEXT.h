@@ -808,8 +808,13 @@ extern char *Text_string[];
 #define TXT_LUNACY				Text_string[618]
 #define TXT_ROBOT_PAINTING_OFF Text_string[619]
 #define TXT_ROBOT_PAINTING_ON Text_string[620]
+#define TXT_NEXT_PRIMARY      Text_string[621]
+#define TXT_PREV_PRIMARY      Text_string[622]
+#define TXT_NEXT_SECONDARY    Text_string[623]
+#define TXT_PREV_SECONDARY    Text_string[624]
 
-#define N_TEXT_STRINGS			621
+#define ACTUAL_TEXT_STRINGS	621
+#define N_TEXT_STRINGS			625
 
 // Constants for keyboard configuration
 #define TNUM_REAR_VIEW			(319-8)

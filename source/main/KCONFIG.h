@@ -164,9 +164,9 @@ extern ubyte Config_cpad_deadzone;
 #define CONTROL_CYBERMAN 6
 #define CONTROL_MAX_TYPES 7
 
-#define NUM_KEY_CONTROLS 46
+#define NUM_KEY_CONTROLS 54
 #define NUM_OTHER_CONTROLS 27
-#define MAX_CONTROLS 50
+#define MAX_CONTROLS 58
 
 extern ubyte kconfig_settings[CONTROL_MAX_TYPES][MAX_CONTROLS];
 extern ubyte default_kconfig_settings[CONTROL_MAX_TYPES][MAX_CONTROLS];

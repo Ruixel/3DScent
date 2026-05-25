@@ -156,7 +156,7 @@ void load_text()
 		cfclose(tfile);
 	}
 
-	for (i=0,tptr=text;i<N_TEXT_STRINGS;i++) {
+	for (i=0,tptr=text;i<ACTUAL_TEXT_STRINGS;i++) {
 		char *p;
 
 		Text_string[i] = tptr;
@@ -166,7 +166,7 @@ void load_text()
 		tptr = strchr(tptr,0x0a);
 
 		if (!tptr)
-			Error("Not enough strings in text file - expecting %d, found %d\nYou most likely do not have the proper version of the data files\nYou need atleast v1.4a REGISTERED\n",N_TEXT_STRINGS,i);
+			Error("Not enough strings in text file - expecting %d, found %d\nYou most likely do not have the proper version of the data files\nYou need atleast v1.4a REGISTERED\n",ACTUAL_TEXT_STRINGS,i);
 
 		if ( tptr ) *tptr++ = 0;
 
@@ -193,6 +193,11 @@ void load_text()
 			p++;
 		}
 
+    // Hard code lol
+    Text_string[621] = "Next Primary";
+    Text_string[622] = "Prev Primary";
+    Text_string[623] = "Next Secondary";
+    Text_string[624] = "Prev Secondary";
 	}
 
 //	Assert(tptr==text+len || tptr==text+len-2);
