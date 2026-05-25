@@ -1262,18 +1262,6 @@ int newmenu_do4( char * title, char * subtitle, int nitems, newmenu_item * item,
 
 	ty = 15;
 
-// draw a close box on the menu
-
-	if (close_box) {
-		close_x = close_y = 5;
-		close_size = 10;
-		gr_setcolor( BM_XRGB(0, 0, 0) );
-		gr_rect(close_x, close_y, close_x + close_size, close_y + close_size);
-		gr_setcolor( BM_XRGB(21, 21, 21) );
-		gr_rect( close_x + 2, close_y + 2, close_x + close_size - 2, close_y + close_size -2 );
-		gr_setcolor( BM_XRGB(0, 0, 0) );
-	}
-
 	if ( title )	{
 		grd_curcanv->cv_font = TITLE_FONT;
 		gr_set_fontcolor( GR_GETCOLOR(31,31,31), -1 );
@@ -2119,17 +2107,6 @@ ReadFileNames:
 		grd_curcanv->cv_font = Gamefonts[GFONT_MEDIUM_3];
 		gr_string( 0x8000, w_y+10, title );
 
-		if (close_box) {
-			close_x = w_x + 5;
-			close_y = w_y + 5;
-			close_size = 10;
-			gr_setcolor( BM_XRGB(0, 0, 0) );
-			gr_rect(close_x, close_y, close_x + close_size, close_y + close_size);
-			gr_setcolor( BM_XRGB(21, 21, 21) );
-			gr_rect(close_x + 2, close_y + 2, close_x + close_size - 2, close_y + close_size -2 );
-			gr_setcolor( BM_XRGB(0, 0, 0) );
-		}
-	
 		initialized = 1;
 	}
 
@@ -2457,17 +2434,6 @@ int newmenu_listbox1( char * title, int nitems, char * items[], int allow_abort_
 	nm_draw_background( wx-15,wy-title_height-15,wx+width+15,wy+height+15 );
 
 	gr_string( 0x8000, wy - title_height, title );
-
-	if (close_box) {
-		close_x = wx - 15 + 5;
-		close_y = wy - title_height - 15 + 5;
-		close_size = 10;
-		gr_setcolor( BM_XRGB(0, 0, 0) );
-		gr_rect(close_x, close_y, close_x + close_size, close_y + close_size);
-		gr_setcolor( BM_XRGB(21, 21, 21) );
-		gr_rect(close_x + 2, close_y + 2, close_x + close_size - 2, close_y + close_size -2 );
-		gr_setcolor( BM_XRGB(0, 0, 0) );
-	}
 
 	done = 0;
 	citem = default_item;
