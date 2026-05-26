@@ -156,5 +156,7 @@ extern char *menu_difficulty_text[];
 extern int Player_default_difficulty;
 extern int Max_debris_objects;
 extern int Auto_leveling_on;
+extern int Config_show_fps;
+extern int Config_use_vsync;
 
 #endif

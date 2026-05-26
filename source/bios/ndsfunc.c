@@ -21,6 +21,7 @@
 #include "fix.h"
 #include "gr.h"
 #include "key.h"
+#include "menu.h"
 #include "mouse.h"
 #include "3d.h"
 #include "game.h"
@@ -1514,15 +1515,17 @@ static u64 next_frame_tick = 0;
 
 void bitblt_to_screen(void)
 {
-    u64 now = svcGetSystemTick();
-    if (next_frame_tick == 0) next_frame_tick = now;
-    if (now < next_frame_tick) {
-        s64 ns = ((next_frame_tick - now) * 1000000000LL) / SYSCLOCK_ARM11;
-        svcSleepThread(ns);
+    if (!Config_use_vsync) {
+      u64 now = svcGetSystemTick();
+      if (next_frame_tick == 0) next_frame_tick = now;
+      if (now < next_frame_tick) {
+          s64 ns = ((next_frame_tick - now) * 1000000000LL) / SYSCLOCK_ARM11;
+          svcSleepThread(ns);
+      }
+      next_frame_tick += SYSCLOCK_ARM11 / 60;
+      u64 now2 = svcGetSystemTick();
+      if (next_frame_tick < now2) next_frame_tick = now2;  // don't try to catch up
     }
-    next_frame_tick += SYSCLOCK_ARM11 / 60;
-    u64 now2 = svcGetSystemTick();
-    if (next_frame_tick < now2) next_frame_tick = now2;  // don't try to catch up
   
     if (!aptMainLoop() && !exit_requested) {
         exit_requested = true;
@@ -1591,6 +1594,7 @@ void bitblt_to_screen(void)
     if (world_vbo_count > 0) {
         GSPGPU_FlushDataCache(world_vbo, sizeof(world_vertex) * world_vbo_count);
     }
+    TIMER_ADD(flush_ticks, t_flush);
 
     // Pass 0 instead of C3D_FRAME_SYNCDRAW so CPU can start the next frame
     // while GPU is still rendering this one. SYNCDRAW capped us at 30 FPS.
@@ -1599,8 +1603,11 @@ void bitblt_to_screen(void)
     // Outstanding risk: back_tex is re-uploaded every frame, so a CPU
     // overwrite during GPU read would tear the bitblt. If observed,
     // double-buffer back_tex.
-    C3D_FrameBegin(0);
-    TIMER_ADD(flush_ticks, t_flush);
+    if (Config_use_vsync) {
+        C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+    } else {
+        C3D_FrameBegin(0);
+    }
 
     // -------- Left eye --------
     TIMER_START(t_left);

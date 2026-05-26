@@ -127,6 +127,8 @@ ubyte do_auto_demo = 1;			// Flag used to enable auto demo starting in main menu
 int Player_default_difficulty; // Last difficulty level chosen by the player
 int Auto_leveling_on = 0;
 int Menu_draw_copyright = 0;
+int Config_show_fps = 1;
+int Config_use_vsync = 0;
 
 void do_option ( int select);
 void do_detail_level_menu_custom(void);
@@ -259,6 +261,33 @@ int DoMenu()
 	return main_menu_choice;
 }
 
+int do_difficulty_menu()
+{
+	int s;
+	newmenu_item m[5];
+
+	m[0].type=NM_TYPE_MENU; m[0].text=MENU_DIFFICULTY_TEXT(0);
+	m[1].type=NM_TYPE_MENU; m[1].text=MENU_DIFFICULTY_TEXT(1);
+	m[2].type=NM_TYPE_MENU; m[2].text=MENU_DIFFICULTY_TEXT(2);
+	m[3].type=NM_TYPE_MENU; m[3].text=MENU_DIFFICULTY_TEXT(3);
+	m[4].type=NM_TYPE_MENU; m[4].text=MENU_DIFFICULTY_TEXT(4);
+
+	s = newmenu_do4( NULL, TXT_DIFFICULTY_LEVEL, NDL, m, NULL, Difficulty_level, NULL, -1, -1, 1);
+
+	if (s > -1 )	{
+		if (s != Difficulty_level)
+		{	
+			Player_default_difficulty = s;
+			write_player_file();
+		}
+		Difficulty_level = s;
+		mprintf((0, "%s %s %i\n", TXT_DIFFICULTY_LEVEL, TXT_SET_TO, Difficulty_level));
+		return 1;
+	}
+	return 0;
+}
+
+
 extern void show_order_form(void);	// John didn't want this in inferno.h so I just externed it.
 void do_new_game_menu();
 
@@ -346,6 +375,11 @@ void do_option ( int select)
 			new_level_num = atoi(m.text);
 
 			if (new_level_num!=0 && new_level_num>=Last_secret_level && new_level_num<=Last_level)	{
+        Difficulty_level = Player_default_difficulty;
+
+        if (!do_difficulty_menu())
+          return;
+
 				gr_palette_fade_out( gr_palette, 32, 0 );
 				StartNewGame(new_level_num);
 			}
@@ -409,32 +443,6 @@ void do_option ( int select)
 			break;
         }
 
-}
-
-int do_difficulty_menu()
-{
-	int s;
-	newmenu_item m[5];
-
-	m[0].type=NM_TYPE_MENU; m[0].text=MENU_DIFFICULTY_TEXT(0);
-	m[1].type=NM_TYPE_MENU; m[1].text=MENU_DIFFICULTY_TEXT(1);
-	m[2].type=NM_TYPE_MENU; m[2].text=MENU_DIFFICULTY_TEXT(2);
-	m[3].type=NM_TYPE_MENU; m[3].text=MENU_DIFFICULTY_TEXT(3);
-	m[4].type=NM_TYPE_MENU; m[4].text=MENU_DIFFICULTY_TEXT(4);
-
-	s = newmenu_do4( NULL, TXT_DIFFICULTY_LEVEL, NDL, m, NULL, Difficulty_level, NULL, -1, -1, 1);
-
-	if (s > -1 )	{
-		if (s != Difficulty_level)
-		{	
-			Player_default_difficulty = s;
-			write_player_file();
-		}
-		Difficulty_level = s;
-		mprintf((0, "%s %s %i\n", TXT_DIFFICULTY_LEVEL, TXT_SET_TO, Difficulty_level));
-		return 1;
-	}
-	return 0;
 }
 
 int	Max_debris_objects, Max_objects_onscreen_detailed;
@@ -848,17 +856,17 @@ void do_options_menu()
 //		m[2].type = NM_TYPE_CHECK; m[2].text=TXT_REVERSE_STEREO; m[2].value=Config_channels_reversed; 
 		m[0].type = NM_TYPE_MENU; m[0].text="Sound/Music Controls...";
 		m[1].type = NM_TYPE_TEXT; m[1].text="";
-		m[2].type = NM_TYPE_SLIDER; m[2].text=TXT_BRIGHTNESS; m[2].value=gr_palette_get_gamma();m[2].min_value=0; m[2].max_value=8; 
-		m[3].type = NM_TYPE_TEXT; m[3].text="";
-		m[4].type = NM_TYPE_MENU; m[4].text=TXT_CONTROLS_;
-		m[5].type = NM_TYPE_MENU; m[5].text=TXT_DETAIL_LEVELS;
-//		m[6].type = NM_TYPE_TEXT; m[6].text=TXT_CAL_JOYSTICK;
-		m[6].type = NM_TYPE_TEXT; m[6].text="";
-		m[7].type = NM_TYPE_CHECK; m[7].text="Ship auto-leveling"; m[9].value=Auto_leveling_on;
-		m[8].type = NM_TYPE_CHECK; m[8].text="Auto-select pri. weapon"; m[10].value=Auto_primary_weapon_selection;
-		m[9].type = NM_TYPE_CHECK; m[9].text="Auto-select sec. weapon"; m[11].value=Auto_secondary_weapon_selection;
+		m[2].type = NM_TYPE_MENU; m[2].text=TXT_CONTROLS_;
+		m[3].type = NM_TYPE_MENU; m[3].text=TXT_DETAIL_LEVELS;
+		m[4].type = NM_TYPE_TEXT; m[4].text="";
+    m[5].type = NM_TYPE_CHECK; m[5].text="Show FPS"; m[5].value=Config_show_fps;
+    m[6].type = NM_TYPE_CHECK; m[6].text="Enable VSync"; m[6].value=Config_use_vsync;
+		m[7].type = NM_TYPE_TEXT; m[7].text="";
+		m[8].type = NM_TYPE_CHECK; m[8].text="Ship auto-leveling"; m[8].value=Auto_leveling_on;
+		m[9].type = NM_TYPE_CHECK; m[9].text="Auto-select pri. weapon"; m[9].value=Auto_primary_weapon_selection;
+		m[10].type = NM_TYPE_CHECK; m[10].text="Auto-select sec. weapon"; m[10].value=Auto_secondary_weapon_selection;
 
-		i = newmenu_do4( NULL, TXT_OPTIONS, 10, m, joydef_menuset, i, NULL, -1, -1, 1 );
+		i = newmenu_do4( NULL, TXT_OPTIONS, 11, m, joydef_menuset, i, NULL, -1, -1, 1 );
 			
 		switch(i)	{
 			case 0: do_sound_menu();			break;
@@ -869,9 +877,12 @@ void do_options_menu()
 
 //		Config_channels_reversed = m[2].value;
 		//Config_joystick_sensitivity = m[7].value;
-		Auto_leveling_on = m[9].value;
-		Auto_primary_weapon_selection=m[10].value;
-		Auto_secondary_weapon_selection=m[11].value;
+    Config_show_fps = m[5].value;
+    Config_use_vsync = m[6].value;
+
+		Auto_leveling_on = m[8].value;
+		Auto_primary_weapon_selection=m[9].value;
+		Auto_secondary_weapon_selection=m[10].value;
 	} while( i>-1 );
 
 //	if ( Config_midi_volume < 1 )	{

@@ -1528,8 +1528,10 @@ void show_framerate(int x, int y)
 //	gr_set_curfont( GAME_FONT );
 //	gr_set_fontcolor(gr_getcolor(0,31,0),-1 );
 
-	ftoa( temp, rate );	// Convert fixed to string
-	hud_printf(&x,&y,"FPS: %s ", temp );
+  if (Config_show_fps) {
+    ftoa( temp, rate );	// Convert fixed to string
+    hud_printf(&x,&y,"FPS: %s ", temp );
+  }
 }
 
 //#endif

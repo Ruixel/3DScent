@@ -393,8 +393,13 @@ int new_player_config()
   Config_cpad_sensitivity = 9;
   Config_cpad_deadzone = 16;
 
+  Config_show_fps = 0;
 	Auto_primary_weapon_selection = 1;
 	Auto_secondary_weapon_selection = 1;
+
+  bool isNew3DS = false;
+  APT_CheckNew3DS(&isNew3DS);
+  Config_use_vsync = isNew3DS;
 
 	// Default taunt macros
 	#ifdef NETWORK
@@ -532,6 +537,10 @@ int read_player_file()
 			errno_ret=errno;
 		else if (fread(&Config_cpad_deadzone, sizeof(ubyte), 1, file )!=1)
 			errno_ret=errno;
+    else if (fread(&Config_show_fps, sizeof(int), 1, file )!=1)
+      errno_ret=errno;
+    else if (fread(&Config_use_vsync, sizeof(int), 1, file )!=1)
+      errno_ret=errno;
 
 		if (Config_control_type == CONTROL_CYBERMAN)
 			Config_control_type = CONTROL_MOUSE;
@@ -743,6 +752,10 @@ char filename[64];
     else if (fwrite( &Config_cpad_sensitivity, sizeof(ubyte), 1, file )!=1)
       errno_ret=errno;
     else if (fwrite( &Config_cpad_deadzone, sizeof(ubyte), 1, file )!=1)
+      errno_ret=errno;
+    else if (fwrite( &Config_show_fps, sizeof(int), 1, file )!=1)
+      errno_ret=errno;
+    else if (fwrite( &Config_use_vsync, sizeof(int), 1, file )!=1)
       errno_ret=errno;
 
 	}
