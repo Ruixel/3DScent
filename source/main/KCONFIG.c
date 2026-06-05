@@ -433,8 +433,8 @@ ubyte system_keys[] = { KEY_ESC, KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F6,
 
 control_info Controls;
 
-ubyte Config_digi_volume = 16;
-ubyte Config_midi_volume = 16;
+ubyte Config_digi_volume = 8;
+ubyte Config_midi_volume = 8;
 ubyte Config_control_type = 0;
 ubyte Config_channels_reversed = 0;
 ubyte Config_joystick_sensitivity = 8;

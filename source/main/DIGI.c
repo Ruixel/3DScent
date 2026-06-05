@@ -428,11 +428,7 @@ void digi_set_midi_volume(int n)
 	else
 		midi_volume = n;
 		
-	if (!old_volume && midi_volume) {
-		digi_play_midi_song(digi_last_midi_song, digi_last_midi_song_loop);
-	} else if (old_volume && !midi_volume) {
-		digi_stop_current_song();
-	}
+  setOggVolume(n / 8.0f);
 }
 
 void digi_set_volume(int dvolume, int mvolume)
@@ -908,7 +904,8 @@ int digi_init()
   }
 
 	digi_set_master_volume(Config_master_volume);
-	digi_set_volume(digi_volume, midi_volume);
+	digi_set_volume(Config_digi_volume, Config_midi_volume);
+	setOggVolume(Config_midi_volume / 8.0f);
 	digi_reset_digi_sounds();
 //	atexit(digi_close);
 

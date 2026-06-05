@@ -7,5 +7,6 @@
 void initOggPlayer(void);
 void shutdownOggPlayer(void);
 bool load_ogg_from_music_library(struct MusicLibrary *library, char *fileName, bool loop);
+void setOggVolume(float volume);
 
 #endif

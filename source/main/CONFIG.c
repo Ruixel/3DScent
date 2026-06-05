@@ -136,8 +136,8 @@ int ReadConfigFile()
 	joy_axis_center[0] = joy_axis_center[1] = joy_axis_center[2] = joy_axis_center[3] = 0;
 	joy_set_cal_vals(joy_axis_min, joy_axis_center, joy_axis_max);
 
-	Config_digi_volume = 4;
-	Config_midi_volume = 4;
+	Config_digi_volume = 8;
+	Config_midi_volume = 8;
 	Config_master_volume = 4;
 	Config_control_type = 0;
 	Config_channels_reversed = 0;
@@ -216,7 +216,8 @@ int ReadConfigFile()
 	if ( Config_midi_volume > 8 ) Config_midi_volume = 8;
 	if ( Config_master_volume > 8 ) Config_master_volume = 8;
 
-	digi_set_volume( (Config_digi_volume*127)/8, (Config_midi_volume*255)/8 );
+	//digi_set_volume( (Config_digi_volume*127)/8, (Config_midi_volume*255)/8 );
+  digi_set_volume( Config_digi_volume, Config_midi_volume );
 	digi_set_master_volume( Config_master_volume );
 
 	return 0;

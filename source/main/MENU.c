@@ -771,11 +771,11 @@ void sound_menuset( int nitems, newmenu_item *items, int *last_key, int citem )
 		digi_set_midi_volume( items[1].value );
 	}
 
-	if ( Config_master_volume != items[2].value ) {
-		Config_master_volume = items[2].value;
-		digi_set_master_volume( items[2].value );
-		digi_play_sample_once( SOUND_DROP_BOMB, F1_0 );
-	}
+	// if ( Config_master_volume != items[2].value ) {
+	// 	Config_master_volume = items[2].value;
+	// 	digi_set_master_volume( items[2].value );
+	// 	digi_play_sample_once( SOUND_DROP_BOMB, F1_0 );
+	// }
 
 //	if (shuffle_levels != items[5].value)
 //		shuffle_levels = items[5].value;
@@ -805,8 +805,8 @@ void do_sound_menu()
 		count = 0;
 		m[0].type = NM_TYPE_SLIDER; m[0].text=TXT_FX_VOLUME; m[0].value=Config_digi_volume;m[0].min_value=0; m[0].max_value=8; count++;
 		m[1].type = NM_TYPE_SLIDER; m[1].text=TXT_MUSIC_VOLUME; m[1].value=Config_midi_volume;m[1].min_value=0; m[1].max_value=8; count++;
-		m[2].type = NM_TYPE_SLIDER; m[2].text="Master Volume"; m[2].value=Config_master_volume;m[2].min_value=0;m[2].max_value=8; count++;
-		m[3].type = NM_TYPE_CHECK; m[3].text=TXT_REVERSE_STEREO; m[3].value=Config_channels_reversed; count++;
+		//m[2].type = NM_TYPE_SLIDER; m[2].text="Master Volume"; m[2].value=Config_master_volume;m[2].min_value=0;m[2].max_value=8; count++;
+		//m[2].type = NM_TYPE_CHECK; m[2].text=TXT_REVERSE_STEREO; m[2].value=Config_channels_reversed; count++;
 #ifndef SHAREWARE
 //		m[4].type = NM_TYPE_TEXT; m[4].text=""; count++;
 //		m[5].type = NM_TYPE_CHECK; m[5].text="Shuffle Play Descent CD\nLevel Songs";m[5].value = shuffle_levels; count++;
@@ -826,10 +826,10 @@ int do_ingame_menu()
 	do {
 		m[0].type = NM_TYPE_MENU; m[0].text="Options...";
 		m[1].type = NM_TYPE_TEXT; m[1].text="";
-		m[2].type = NM_TYPE_MENU; m[2].text="Savegame...";
-		m[3].type = NM_TYPE_MENU; m[3].text="Loadgame...";
+		m[2].type = NM_TYPE_MENU; m[2].text="Save Game...";
+		m[3].type = NM_TYPE_MENU; m[3].text="Load Game...";
 		m[4].type = NM_TYPE_TEXT; m[4].text="";
-		m[5].type = NM_TYPE_MENU; m[5].text="Abort game";
+		m[5].type = NM_TYPE_MENU; m[5].text="Abort Game";
 
 		i = newmenu_do4( NULL, TXT_OPTIONS, 6, m, NULL, i, NULL, -1, -1, 1 );
 

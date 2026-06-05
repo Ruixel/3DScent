@@ -46,6 +46,7 @@ static OggVorbis_File s_vorbisFile;
 static Thread s_threadId;
 static bool s_oggLoaded = false;
 static bool s_oggLoop = false;
+static float s_oggVolume = 1.0f;
 
 typedef struct {
     char *data;
@@ -144,7 +145,18 @@ bool audioInit(OggVorbis_File *vorbisFile_) {
         buffer += WAVEBUF_SIZE / sizeof(buffer[0]);
     }
 
+    float mix[16] = {0};
+    mix[0] = mix[1] = mix[2] = mix[3] = s_oggVolume;
+    ndspChnSetMix(START_CHANNEL, mix);
+
     return true;
+}
+
+void setOggVolume(float volume) {
+    s_oggVolume = volume;
+    float mix[16] = {0};
+    mix[0] = mix[1] = mix[2] = mix[3] = volume;
+    ndspChnSetMix(START_CHANNEL, mix);
 }
 
 // Audio de-initialisation code
