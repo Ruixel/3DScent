@@ -431,7 +431,7 @@ void gr_palette_load( ubyte * pal )
 		ds_palette[i] = (r >> 1) | ((g & ~1) << 4) | ((b & ~1) << 9);
 	}
 	palette_updated = 1;
-	gr_palette_faded_out = 0;
+	//gr_palette_faded_out = 0;
 
 	init_computed_colors();
 }
