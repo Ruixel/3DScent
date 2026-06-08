@@ -870,8 +870,8 @@ void do_options_menu()
 			
 		switch(i)	{
 			case 0: do_sound_menu();			break;
-			case 4: joydefs_config(); 			break;
-			case 5: do_detail_level_menu();		break;
+			case 2: joydefs_config(); 			break;
+			case 3: do_detail_level_menu();		break;
 //			case 6: joydefs_calibrate();		break;
 		}
 
