@@ -710,7 +710,6 @@ void DoEndLevelScoreGlitzPoll( int nitems, newmenu_item * menus, int * key, int 
 
 void DoGameOver()
 {
-//	nm_messagebox( TXT_GAME_OVER, 1, TXT_OK, "" );
 	time_out_value = timer_get_fixed_seconds() + i2f(60*5);
 	nm_messagebox1( TXT_GAME_OVER, DoEndLevelScoreGlitzPoll, 1, TXT_OK, "" );
 

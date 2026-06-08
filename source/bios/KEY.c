@@ -445,7 +445,7 @@ void key_flush()
 	for (i=0; i<256; i++ )	{
 		keyd_pressed[i] = 0;
 		key_data.keys[i].state = 1;
-		key_data.keys[i].last_state = 0;
+		key_data.keys[i].last_state = 1;
 		key_data.keys[i].timewentdown = curtime;
 		key_data.keys[i].downcount=0;
 		key_data.keys[i].upcount=0;

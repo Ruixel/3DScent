@@ -355,11 +355,7 @@ void scores_read()
 	}
 		
 	fsize = filelength( fp );
-  printf( "Scores file is %d bytes\n", fsize );
-
 	if ( fsize != 336 )	{
-    printf( "Scores file is wrong size!  Resetting...\n" );
-    printf(" Size of all_scores is %d\n", sizeof(all_scores) );
 		fclose(fp);
 
 		return;
@@ -449,6 +445,7 @@ void scores_maybe_add_player(int abort_flag)
 	char text1[COOL_MESSAGE_LEN+10];
 	newmenu_item m[10];
 	int i,position;
+
 	scores_read();
 	
 	position = MAX_HIGH_SCORES;
