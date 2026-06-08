@@ -471,6 +471,7 @@ void scores_maybe_add_player(int abort_flag)
 			m[0].type = NM_TYPE_TEXT; m[0].text = TXT_COOL_SAYING;
 			m[1].type = NM_TYPE_INPUT; m[1].text = text1; m[1].text_len = COOL_MESSAGE_LEN-5;
 			newmenu_do( TXT_HIGH_SCORE, TXT_YOU_PLACED_1ST, 2, m, NULL );
+      printf( "Cool saying: %s\n", text1 );
 			strncpy( Scores.cool_saying, text1, COOL_MESSAGE_LEN );
 			if (strlen(Scores.cool_saying)<1)
 				sprintf( Scores.cool_saying, "No Comment" );
@@ -578,7 +579,7 @@ ReshowScores:
 
 	grd_curcanv->cv_font = Gamefonts[GFONT_MEDIUM_3];
 
-	gr_string( 0x8000, 30, TXT_HIGH_SCORES );
+	gr_string( 0x8000, 20, TXT_HIGH_SCORES );
 
 	grd_curcanv->cv_font = Gamefonts[GFONT_SMALL];
 
@@ -587,16 +588,16 @@ ReshowScores:
 	gr_string(  82+33+XX, 46+7+YY, TXT_SCORE );
 	gr_string( 127+33+XX, 46+7+YY, TXT_SKILL );
 	gr_string( 170+33+XX, 46+7+YY, TXT_LEVELS );
-//	gr_string( 202, 46, "Kills" );
+	//gr_string( 202, 46, "Kills" );
 //	gr_string( 234, 46, "Rescues" );
 	gr_string( 288-42+XX, 46+7+YY, TXT_TIME );
 
 	if ( citem < 0 )	
-		gr_string( 0x8000, 175, TXT_PRESS_CTRL_R );
+		gr_string( 0x8000, 175, "Press X to reset" );
 
 	gr_set_fontcolor( BM_XRGB(28,28,28), -1 );
 
-//	gr_printf( 0x8000, 31, "%c%s%c  - %s", 34, Scores.cool_saying, 34, Scores.stats[0].name );
+	gr_printf( 0x8000, 32, "%c%s%c  - %s", 34, Scores.cool_saying, 34, Scores.stats[0].name );
 	
 	for (i=0; i<MAX_HIGH_SCORES; i++ )		{
 		if (i==0)	{
@@ -638,7 +639,7 @@ ReshowScores:
 
 		k = key_inkey();
 		switch( k )	{
-		case KEY_CTRLED+KEY_R:		
+		case KEY_X:		
 			if ( citem < 0 )		{
 				// Reset scores...
 				if ( nm_messagebox( NULL, 2,  TXT_NO, TXT_YES, TXT_RESET_HIGH_SCORES )==1 )	{
