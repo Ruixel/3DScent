@@ -228,7 +228,7 @@ int pcx_read_bitmap( const char * filename, grs_bitmap * bmp,int bitmap_type ,ub
 	ubyte data, *pixdata;
 	fix	xstep, ystep, fx, fy;
 
-  printf("hi1\n");
+  //printf("hi1\n");
 
 	PCXfile = cfopen( filename , "rb" );
 	if ( !PCXfile )
@@ -329,7 +329,7 @@ int pcx_read_bitmap( const char * filename, grs_bitmap * bmp,int bitmap_type ,ub
 			}
 		}
 	}
-  printf("hi\n");
+  //printf("hi\n");
 
 	// Read the extended palette at the end of PCX file
 	if ( palette != NULL )	{

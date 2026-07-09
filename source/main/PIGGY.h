@@ -114,6 +114,7 @@ void piggy_read_bitmap_data(grs_bitmap * bmp);
 void piggy_read_sound_data(digi_sound	*snd);
 
 void piggy_load_level_data();
+void piggy_preload_all_textures();
 
 #ifdef SHAREWARE
 #define MAX_BITMAP_FILES	1500

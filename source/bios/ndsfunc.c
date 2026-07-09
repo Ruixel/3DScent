@@ -360,6 +360,8 @@ static bool gpu_tex_upload_to_slot(grs_bitmap* bmp, int slot)
     if (slot < 0 || slot >= GPU_TEX_MAX) return false;
     if (gpu_tex_pool[slot].tex) return false;
 
+    //printf("Uploading bitmap %d (%dx%d) to GPU slot %d\n", bmp - GameBitmaps, bmp->bm_w, bmp->bm_h, slot);
+
     u8* indexed_data;
     bool we_allocated = false;
     if (bmp->bm_flags & BM_FLAG_RLE) {
@@ -490,11 +492,14 @@ static texmerge_track_t* texmerge_track_get(grs_bitmap* bm)
     return &texmerge_track[0];
 }
 
-// page_out_all() frees all bm_data before init_nds_textures runs, so we
-// need to page each bitmap back in from disk before we can upload it.
+extern void texture_load_progress(int loaded, int total);
+
 static void gpu_tex_preload_all(void)
 {
     extern int Num_bitmap_files;
+
+    int update_every = Num_bitmap_files / 50;
+    if (update_every < 1) update_every = 1;
 
     for (int i = 0; i < Num_bitmap_files; i++) {
         bitmap_index bi;
@@ -504,6 +509,10 @@ static void gpu_tex_preload_all(void)
             piggy_bitmap_page_in(bi);
         }
         gpu_tex_upload_one(i);
+
+        if (i % update_every == 0 || i == Num_bitmap_files - 1) {
+            texture_load_progress(i + 1, Num_bitmap_files);
+        }
     }
 
     printf("gpu_tex: loaded %d/%d bitmaps, %d KB\n",

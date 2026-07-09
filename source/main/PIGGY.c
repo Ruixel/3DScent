@@ -1026,16 +1026,13 @@ void piggy_bitmap_page_in( bitmap_index bitmap )
 	}
 }
 
-void piggy_bitmap_page_out_all()
+void piggy_preload_all_textures()
 {
+	static int textures_uploaded_once = 0;
 	int i;
-	
-	Piggy_bitmap_cache_next = 0;
 
-	piggy_page_flushed++;
-
-	texmerge_flush();
-	rle_cache_flush();
+	if ( textures_uploaded_once )
+		return;
 
 	for (i=0; i<Num_bitmap_files; i++ )		{
 		if ( GameBitmapOffset[i] > 0 )	{	// Don't page out bitmaps read from disk!!!
@@ -1048,6 +1045,21 @@ void piggy_bitmap_page_out_all()
 		}
 	}
 
+	init_nds_textures ();
+	textures_uploaded_once = 1;
+}
+
+void piggy_bitmap_page_out_all()
+{
+	int i;
+
+	Piggy_bitmap_cache_next = 0;
+
+	piggy_page_flushed++;
+
+	texmerge_flush();
+	rle_cache_flush();
+
 	for (i=0; i<Num_sound_files; i++)
 	{
 		if (GameSounds[i].data)
@@ -1055,7 +1067,7 @@ void piggy_bitmap_page_out_all()
 		GameSounds[i].data = NULL;
 	}
 
-	init_nds_textures ();
+	piggy_preload_all_textures();
 
 	mprintf(( 0, "Flushing piggy bitmap cache\n" ));
 }

@@ -658,6 +658,7 @@ static char copyright[] = "DESCENT   COPYRIGHT (C) 1994,1995 PARALLAX SOFTWARE C
 #include "timer.h"
 #include "3d.h"
 #include "bm.h"
+#include "piggy.h"
 #include "inferno.h"
 #include "error.h"
 //#include "cflib.h"
@@ -1132,6 +1133,52 @@ printf("show_pcx: calling pcx_read_bitmap '%s'\n", filename); fflush(stdout);
 	} else {
 		Error("Couldn't load pcx file '%s', PCX load error: %s\n", filename, pcx_errormsg(pcx_error));
 	}
+}
+
+void add_pcx (const char *filename)
+{
+	ubyte title_pal[768];
+	int pcx_error;
+	grs_bitmap bmp;
+
+	extern ubyte back_buffer[];
+	bmp.bm_x = 0; bmp.bm_y = 0;
+	bmp.bm_w = 320; bmp.bm_h = 200;
+	bmp.bm_rowsize = 320;
+	bmp.bm_type = BM_LINEAR;
+	bmp.bm_data = back_buffer;
+
+	pcx_error = pcx_read_bitmap(filename, &bmp, BM_LINEAR, title_pal);
+	if (pcx_error == PCX_ERROR_NONE) {
+		gr_palette_load(title_pal);
+	} else {
+		Error("Couldn't load pcx file '%s', PCX load error: %s\n", filename, pcx_errormsg(pcx_error));
+	}
+}
+
+// Drawn over whatever's already on screen (the descent.pcx splash), so no
+// gr_clear_canvas here.
+void texture_load_progress(int loaded, int total)
+{
+  add_pcx("descent.pcx");
+
+	int bar_w = 200, bar_h = 8;
+	int bar_x = (320 - bar_w) / 2;
+	int bar_y = grd_curcanv->cv_bitmap.bm_h / 2 + 80;
+	int fill_w = total > 0 ? bar_w * loaded / total : 0;
+
+	gr_set_curfont(Gamefonts[GFONT_SMALL]);
+	gr_set_fontcolor(gr_find_closest_color_current(255, 255, 255), -1);
+	gr_printf(0x8000, grd_curcanv->cv_bitmap.bm_h / 2 + 64, "%s... %d/%d", TXT_LOADING_DATA, loaded, total);
+
+	gr_setcolor(gr_find_closest_color_current(10, 10, 10));
+	gr_rect(bar_x, bar_y, bar_x + bar_w, bar_y + bar_h);
+
+	gr_setcolor(gr_find_closest_color_current(180, 0, 0));
+	if (fill_w > 0)
+		gr_rect(bar_x, bar_y, bar_x + fill_w, bar_y + bar_h);
+
+	bitblt_to_screen();
 }
 
 void descent_main(int argc,char **argv)
@@ -1655,6 +1702,9 @@ void descent_main(int argc,char **argv)
 		bm_init();
 #endif
 
+	piggy_preload_all_textures();
+  show_pcx("descent.pcx");
+
 	//if ( FindArg( "-norun" ) )
 		//return(0);
 
@@ -1960,8 +2010,8 @@ int main(int argc, char** argv) {
 
     init_3ds_gpu();
 
-    freopen("sdmc:/3dscent.log", "w", stdout);
-    setbuf(stdout, NULL);
+    //freopen("sdmc:/3dscent.log", "w", stdout);
+    //setbuf(stdout, NULL);
     chdir("sdmc:/3dscent/");
 
     // Debug: list romfs contents
